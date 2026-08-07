@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { PossibleDuplicates } from "@/components/app/possible-duplicates";
 import {
   importFields,
   getImportUploadFile,
@@ -22,11 +23,14 @@ import {
   readImportFile,
 } from "@/lib/import-service";
 import type { ColumnMapping, ImportPreview } from "@/lib/finance-types";
+import type { PossibleDuplicateGroup } from "@/lib/finance-types";
+import { groupPossibleDuplicates } from "@/lib/transaction-update-service";
+import { productTitle } from "@/lib/product-config";
 
 export const Route = createFileRoute("/importar")({
   head: () => ({
     meta: [
-      { title: "Importar planilha — Clareza" },
+      { title: productTitle("Importar planilha") },
       { name: "description", content: "Envie um Excel ou CSV e organize seus dados financeiros." },
     ],
   }),
@@ -51,23 +55,34 @@ function ImportPage() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newProjectName, setNewProjectName] = useState("");
+  const [duplicateGroups, setDuplicateGroups] = useState<PossibleDuplicateGroup[]>([]);
 
-  const commit = async (parsed: ImportPreview, selectedMapping = parsed.mapping) => {
-    setPreview(null);
-    setMapping(null);
-    setStep(2);
+  const commit = async (
+    parsed: ImportPreview,
+    selectedMapping = parsed.mapping,
+    duplicatesConfirmed = false,
+  ) => {
     setError(null);
     try {
       const rows = normalizeImportedRows(parsed, selectedMapping);
+      const groups = groupPossibleDuplicates(rows);
+      if (groups.length && !duplicatesConfirmed) {
+        setPreview(parsed);
+        setMapping(selectedMapping);
+        setDuplicateGroups(groups);
+        setStep(-1);
+        return;
+      }
+      setPreview(null);
+      setMapping(null);
+      setStep(2);
       const targetProject = project ?? createProject({ name: newProjectName });
       setStep(3);
       replaceTransactions(rows, targetProject.id);
       setImportProfile({ headers: parsed.headers, mapping: selectedMapping }, targetProject.id);
       setStep(4);
       setOnboarded(true);
-      await new Promise((resolve) => setTimeout(resolve, 450));
       setStep(steps.length);
-      await new Promise((resolve) => setTimeout(resolve, 650));
       await navigate({ to: "/dashboard" });
     } catch (cause) {
       setStep(-1);
@@ -78,6 +93,7 @@ function ImportPage() {
   const start = async (file: File) => {
     setFileName(file.name);
     setError(null);
+    setDuplicateGroups([]);
     setStep(0);
     try {
       const parsed = await readImportFile(file);
@@ -117,14 +133,18 @@ function ImportPage() {
                 </span>
                 <div>
                   <h1 className="text-lg font-semibold">
-                    {preview.missingFields.length
-                      ? "Confirme as colunas da planilha"
-                      : "Crie o projeto da importação"}
+                    {duplicateGroups.length
+                      ? "Revise as possíveis duplicatas"
+                      : preview.missingFields.length
+                        ? "Confirme as colunas da planilha"
+                        : "Crie o projeto da importação"}
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {preview.missingFields.length
-                      ? `Algumas colunas não foram reconhecidas automaticamente em ${preview.fileName}.`
-                      : `Informe o nome do projeto que receberá os dados de ${preview.fileName}.`}
+                    {duplicateGroups.length
+                      ? "Encontramos linhas idênticas. Revise-as antes de importar; nenhuma será removida."
+                      : preview.missingFields.length
+                        ? `Algumas colunas não foram reconhecidas automaticamente em ${preview.fileName}.`
+                        : `Informe o nome do projeto que receberá os dados de ${preview.fileName}.`}
                   </p>
                 </div>
               </div>
@@ -193,12 +213,18 @@ function ImportPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="mt-5">
+                <PossibleDuplicates groups={duplicateGroups} />
+              </div>
               <div className="mt-5 flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
                   Prévia das primeiras {Math.min(5, preview.rows.length)} linhas
                 </p>
-                <Button disabled={!readyToMap} onClick={() => void commit(preview, mapping)}>
-                  Importar lançamentos
+                <Button
+                  disabled={!readyToMap}
+                  onClick={() => void commit(preview, mapping, duplicateGroups.length > 0)}
+                >
+                  {duplicateGroups.length ? "Importar mantendo todas" : "Importar lançamentos"}
                 </Button>
               </div>
             </motion.div>

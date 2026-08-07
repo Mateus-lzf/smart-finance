@@ -6,16 +6,17 @@ import { Panel } from "@/components/app/panel";
 import { useApp } from "@/lib/app-store";
 import { brl } from "@/lib/mock-data";
 import { kpisFromTransactions, monthlySeriesFromTransactions } from "@/lib/finance-service";
+import { productTitle } from "@/lib/product-config";
 
 export const Route = createFileRoute("/relatorios")({
   head: () => ({
     meta: [
-      { title: "Relatórios financeiros — Clareza" },
+      { title: productTitle("Relatórios financeiros") },
       {
         name: "description",
         content: "Resumos financeiros calculados a partir dos lançamentos do projeto.",
       },
-      { property: "og:title", content: "Relatórios financeiros — Clareza" },
+      { property: "og:title", content: productTitle("Relatórios financeiros") },
       {
         property: "og:description",
         content: "Resumos calculados a partir dos lançamentos do projeto.",

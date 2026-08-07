@@ -13,17 +13,18 @@ import {
 } from "@/components/app/charts";
 import { useApp } from "@/lib/app-store";
 import { kpisFromTransactions } from "@/lib/finance-service";
+import { productTitle } from "@/lib/product-config";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard financeiro — Clareza" },
+      { title: productTitle("Dashboard financeiro") },
       {
         name: "description",
         content:
           "Receita, despesas, lucro e fluxo de caixa calculados a partir dos seus lançamentos.",
       },
-      { property: "og:title", content: "Dashboard financeiro — Clareza" },
+      { property: "og:title", content: productTitle("Dashboard financeiro") },
       {
         property: "og:description",
         content: "Indicadores financeiros atualizados a partir dos dados do seu projeto.",

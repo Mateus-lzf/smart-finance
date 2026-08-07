@@ -2,17 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app/app-shell";
 import { DataTable } from "@/components/app/data-table";
 import { ProjectEmptyState } from "@/components/app/project-empty-state";
+import { productTitle } from "@/lib/product-config";
 import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/dados")({
   head: () => ({
     meta: [
-      { title: "Dados e lançamentos — Clareza" },
+      { title: productTitle("Dados e lançamentos") },
       {
         name: "description",
         content: "Uma tabela leve para pesquisar, filtrar e editar seus lançamentos financeiros.",
       },
-      { property: "og:title", content: "Dados e lançamentos — Clareza" },
+      { property: "og:title", content: productTitle("Dados e lançamentos") },
       {
         property: "og:description",
         content: "Pesquise, filtre e edite lançamentos como em um documento.",

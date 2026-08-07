@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { productTitle } from "@/lib/product-config";
 import { useState } from "react";
 import { FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/criar")({
-  head: () => ({ meta: [{ title: "Criar projeto — Clareza" }] }),
+  head: () => ({ meta: [{ title: productTitle("Criar projeto") }] }),
   component: CreateProjectPage,
 });
 

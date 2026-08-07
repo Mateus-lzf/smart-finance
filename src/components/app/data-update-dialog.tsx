@@ -15,6 +15,8 @@ import {
 } from "@/lib/import-service";
 import { cn } from "@/lib/utils";
 import { compareTransactionUpdates, reuseImportMapping } from "@/lib/transaction-update-service";
+import { groupPossibleDuplicates } from "@/lib/transaction-update-service";
+import { PossibleDuplicates } from "./possible-duplicates";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -255,6 +257,7 @@ export function DataUpdateDialog() {
                   serão preservadas na atualização.
                 </p>
               )}
+              <PossibleDuplicates groups={groupPossibleDuplicates(comparison.possibleDuplicates)} />
               <p className="text-sm text-muted-foreground">
                 Confirme para substituir os lançamentos do projeto atual. Esta ação atualizará
                 também o Dashboard e os Relatórios.

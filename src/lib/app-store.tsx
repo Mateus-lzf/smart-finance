@@ -10,8 +10,10 @@ import {
 import type { ImportProfile, Project, ProjectInput, Transaction } from "./finance-types";
 import {
   LOCAL_STATE_KEY,
+  LEGACY_LOCAL_STATE_KEYS,
+  deleteProjectFromLocalState,
   parseLocalState,
-  serializeLocalState,
+  persistLocalState,
   type LocalState,
 } from "./local-state-service";
 import { createLocalProject, updateLocalProject } from "./project-service";
@@ -62,9 +64,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       localStorage.removeItem("fin.state");
-      const raw = localStorage.getItem(LOCAL_STATE_KEY);
+      const legacyKey = LEGACY_LOCAL_STATE_KEYS.find((key) => localStorage.getItem(key));
+      const raw =
+        localStorage.getItem(LOCAL_STATE_KEY) ??
+        (legacyKey ? localStorage.getItem(legacyKey) : null);
       if (raw) {
         const state = parseLocalState(raw);
+        if (legacyKey) {
+          persistLocalState(localStorage, state);
+          localStorage.removeItem(legacyKey);
+        }
         const storedProjects = state.projects;
         setProjects(storedProjects);
         setTransactionsByProject(state.transactionsByProject);
@@ -90,7 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importProfilesByProject,
     };
     try {
-      localStorage.setItem(LOCAL_STATE_KEY, serializeLocalState(state));
+      persistLocalState(localStorage, state);
     } catch {
       // The current session keeps working if storage is unavailable or full.
     }
@@ -118,24 +127,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const deleteProject = useCallback((id: string) => {
-    setProjects((current) => {
-      const next = current.filter((project) => project.id !== id);
-      setProjectIdState((activeId) => (activeId === id ? (next[0]?.id ?? null) : activeId));
-      setOnboarded(next.length > 0);
-      return next;
-    });
-    setTransactionsByProject((current) => {
-      const { [id]: removed, ...next } = current;
-      void removed;
-      return next;
-    });
-    setImportProfilesByProject((current) => {
-      const { [id]: removed, ...next } = current;
-      void removed;
-      return next;
-    });
-  }, []);
+  const deleteProject = useCallback(
+    (id: string) => {
+      const next = deleteProjectFromLocalState(
+        {
+          projects,
+          activeProjectId: projectId,
+          transactionsByProject,
+          importProfilesByProject,
+        },
+        id,
+      );
+      try {
+        persistLocalState(localStorage, next);
+      } catch {
+        // React state remains authoritative when storage is unavailable.
+      }
+      setProjects(next.projects);
+      setProjectIdState(next.activeProjectId);
+      setTransactionsByProject(next.transactionsByProject);
+      setImportProfilesByProject(next.importProfilesByProject);
+      setOnboarded(next.projects.length > 0);
+    },
+    [projects, projectId, transactionsByProject, importProfilesByProject],
+  );
 
   const setImportProfile = useCallback(
     (profile: ImportProfile, targetProjectId?: string) => {

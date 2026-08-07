@@ -10,10 +10,11 @@ import {
   Menu,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-store";
 import { appNavigation } from "@/lib/app-navigation";
+import { PRODUCT_NAME } from "@/lib/product-config";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   DropdownMenu,
@@ -117,9 +118,7 @@ export function AppShell({
             <Sparkles className="size-4" />
           </div>
           {!collapsed && (
-            <span className="text-[15px] font-semibold tracking-tight">
-              Clareza<span className="text-primary">.</span>
-            </span>
+            <span className="text-[15px] font-semibold tracking-tight">{PRODUCT_NAME}</span>
           )}
         </div>
 
@@ -190,17 +189,7 @@ export function AppShell({
           </div>
         </header>
 
-        <AnimatePresence mode="wait">
-          <motion.main
-            key={pathname}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="flex-1 px-5 py-6 md:px-8"
-          >
-            {children}
-          </motion.main>
-        </AnimatePresence>
+        <main className="flex-1 px-5 py-6 md:px-8">{children}</main>
       </div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-[280px] bg-sidebar p-3">
@@ -209,7 +198,7 @@ export function AppShell({
               <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
                 <Sparkles className="size-4" />
               </span>
-              Clareza<span className="-ml-2 text-primary">.</span>
+              {PRODUCT_NAME}
             </SheetTitle>
           </SheetHeader>
           <div className="mt-2">

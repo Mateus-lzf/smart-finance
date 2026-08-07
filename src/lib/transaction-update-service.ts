@@ -2,6 +2,7 @@ import type {
   ColumnMapping,
   ImportPreview,
   ImportProfile,
+  PossibleDuplicateGroup,
   Transaction,
   TransactionUpdateComparison,
 } from "./finance-types";
@@ -27,6 +28,21 @@ export function transactionFingerprint(transaction: Transaction) {
     normalizeText(transaction.method),
     transaction.status,
   ].join("|");
+}
+
+export function groupPossibleDuplicates(rows: Transaction[]): PossibleDuplicateGroup[] {
+  const groups = new Map<string, Transaction[]>();
+  rows.forEach((row) => {
+    const fingerprint = transactionFingerprint(row);
+    groups.set(fingerprint, [...(groups.get(fingerprint) ?? []), row]);
+  });
+  return [...groups.entries()]
+    .filter(([, occurrences]) => occurrences.length > 1)
+    .map(([fingerprint, occurrences]) => ({
+      fingerprint,
+      transaction: occurrences[0]!,
+      occurrences: occurrences.length,
+    }));
 }
 
 export function reuseImportMapping(
@@ -67,16 +83,12 @@ export function compareTransactionUpdates(
   current: Transaction[],
   imported: Transaction[],
 ): TransactionUpdateComparison {
-  const seenFingerprints = new Set<string>();
-  const possibleDuplicates: Transaction[] = [];
-  imported.forEach((row) => {
-    const fingerprint = transactionFingerprint(row);
-    if (seenFingerprints.has(fingerprint)) {
-      possibleDuplicates.push(row);
-    } else {
-      seenFingerprints.add(fingerprint);
-    }
-  });
+  const duplicateFingerprints = new Set(
+    groupPossibleDuplicates(imported).map((group) => group.fingerprint),
+  );
+  const possibleDuplicates = imported.filter((row) =>
+    duplicateFingerprints.has(transactionFingerprint(row)),
+  );
 
   const currentGroups = groupByIdentity(current);
   const importedGroups = groupByIdentity(imported);

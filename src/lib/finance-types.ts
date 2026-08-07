@@ -61,6 +61,12 @@ export type TransactionUpdateComparison = {
   nextTransactions: Transaction[];
 };
 
+export type PossibleDuplicateGroup = {
+  fingerprint: string;
+  transaction: Transaction;
+  occurrences: number;
+};
+
 export type MonthPoint = {
   month: string;
   receita: number;

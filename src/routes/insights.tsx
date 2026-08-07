@@ -2,10 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Lightbulb } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { ProjectEmptyState } from "@/components/app/project-empty-state";
+import { productTitle } from "@/lib/product-config";
 import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/insights")({
-  head: () => ({ meta: [{ title: "Insights financeiros — Clareza" }] }),
+  head: () => ({ meta: [{ title: productTitle("Insights financeiros") }] }),
   component: InsightsPage,
 });
 

@@ -2,19 +2,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Check, Lock } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
+import { productTitle } from "@/lib/product-config";
 import { Panel } from "@/components/app/panel";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { persistTheme, readStoredTheme, type Theme } from "@/lib/theme-service";
 
 export const Route = createFileRoute("/configuracoes")({
   head: () => ({
     meta: [
-      { title: "Configurações da conta — Clareza" },
+      { title: productTitle("Configurações da conta") },
       {
         name: "description",
         content: "Ajuste perfil, tema, idioma, plano e integrações da sua conta.",
       },
-      { property: "og:title", content: "Configurações da conta — Clareza" },
+      { property: "og:title", content: productTitle("Configurações da conta") },
       { property: "og:description", content: "Perfil, aparência, idioma e plano em um só lugar." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -36,10 +38,10 @@ const integrations = [
 ];
 
 function ConfigPage() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<Theme>(readStoredTheme);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark");
+    persistTheme(theme);
   }, [theme]);
 
   return (

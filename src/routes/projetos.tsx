@@ -19,11 +19,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/lib/app-store";
 import { brl } from "@/lib/mock-data";
 import { kpisFromTransactions } from "@/lib/finance-service";
+import { productTitle } from "@/lib/product-config";
 import type { Project } from "@/lib/finance-types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/projetos")({
-  head: () => ({ meta: [{ title: "Seus projetos financeiros — Clareza" }] }),
+  head: () => ({ meta: [{ title: productTitle("Seus projetos financeiros") }] }),
   component: ProjetosPage,
 });
 

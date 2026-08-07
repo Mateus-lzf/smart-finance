@@ -60,6 +60,7 @@ try {
   const updateService = await vite.ssrLoadModule("/src/lib/transaction-update-service.ts");
   const localState = await vite.ssrLoadModule("/src/lib/local-state-service.ts");
   const navigation = await vite.ssrLoadModule("/src/lib/app-navigation.ts");
+  const themeService = await vite.ssrLoadModule("/src/lib/theme-service.ts");
   const csv = [
     "Data;Descrição;Categoria;Tipo;Valor",
     '01/07/2026;"Venda, balcão";Vendas;Receita;2.500,00',
@@ -186,7 +187,8 @@ try {
   assert.equal(comparison.changed[0].after.amount, 3000);
   assert.equal(comparison.added.length, 2, "todas as novas linhas devem ser identificadas");
   assert.equal(comparison.removed.length, 1, "linha ausente deve ser removida");
-  assert.equal(comparison.possibleDuplicates.length, 1);
+  assert.equal(comparison.possibleDuplicates.length, 2);
+  assert.equal(updateService.groupPossibleDuplicates(nextRows)[0].occurrences, 2);
   assert.equal(
     comparison.nextTransactions.length,
     3,
@@ -216,7 +218,11 @@ try {
   };
   const legitimateRepeatedRows = [repeatedBase, { ...repeatedBase, id: "uber-2" }];
   const repeatedComparison = updateService.compareTransactionUpdates([], legitimateRepeatedRows);
-  assert.equal(repeatedComparison.possibleDuplicates.length, 1);
+  assert.equal(repeatedComparison.possibleDuplicates.length, 2);
+  assert.deepEqual(
+    updateService.groupPossibleDuplicates(legitimateRepeatedRows).map((group) => group.occurrences),
+    [2],
+  );
   assert.equal(repeatedComparison.added.length, 2);
   assert.equal(repeatedComparison.nextTransactions.length, 2);
   assert.deepEqual(
@@ -252,6 +258,44 @@ try {
   assert.deepEqual(reloaded.transactionsByProject[createdProject.id], comparison.nextTransactions);
   assert.deepEqual(reloaded.importProfilesByProject[createdProject.id].mapping, reusedMapping);
 
+  const memory = new Map();
+  const storage = {
+    setItem(key, value) {
+      memory.set(key, value);
+    },
+    getItem(key) {
+      return memory.get(key) ?? null;
+    },
+  };
+  const stateBeforeDeletion = {
+    projects: [createdProject, secondProject],
+    activeProjectId: createdProject.id,
+    transactionsByProject: {
+      [createdProject.id]: comparison.nextTransactions,
+      [secondProject.id]: [],
+    },
+    importProfilesByProject: {
+      [createdProject.id]: { headers: nextPreview.headers, mapping: reusedMapping },
+    },
+  };
+  localState.persistLocalState(storage, stateBeforeDeletion);
+  const stateAfterDeletion = localState.deleteProjectFromLocalState(
+    stateBeforeDeletion,
+    createdProject.id,
+  );
+  localState.persistLocalState(storage, stateAfterDeletion);
+  const reloadedImmediately = localState.parseLocalState(
+    storage.getItem(localState.LOCAL_STATE_KEY),
+  );
+  assert.deepEqual(
+    reloadedImmediately.projects.map((project) => project.id),
+    [secondProject.id],
+  );
+  assert.equal(reloadedImmediately.activeProjectId, secondProject.id);
+  assert.equal(createdProject.id in reloadedImmediately.transactionsByProject, false);
+  assert.equal(createdProject.id in reloadedImmediately.importProfilesByProject, false);
+  console.log("Exclusão persistente permanece após recarga imediata: OK");
+
   const intactBeforeInvalid = structuredClone(initial);
   await assert.rejects(
     () => importer.readImportFile(new File(["sem dados"], "invalido.txt")),
@@ -269,6 +313,18 @@ try {
     ["/projetos", "/dashboard", "/dados", "/insights", "/relatorios", "/configuracoes"],
   );
   console.log("Navegação móvel compartilha todas as rotas principais: OK");
+
+  const themeMemory = new Map();
+  const themeStorage = {
+    getItem: (key) => themeMemory.get(key) ?? null,
+    setItem: (key, value) => themeMemory.set(key, value),
+  };
+  assert.equal(themeService.readStoredTheme(themeStorage), "light");
+  themeService.persistTheme("dark", themeStorage);
+  assert.equal(themeService.readStoredTheme(themeStorage), "dark");
+  themeService.persistTheme("light", themeStorage);
+  assert.equal(themeService.readStoredTheme(themeStorage), "light");
+  console.log("Persistência do tema entre montagens e recargas: OK");
 } finally {
   await vite.close();
 }

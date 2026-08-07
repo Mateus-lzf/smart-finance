@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { ProjectEmptyState } from "@/components/app/project-empty-state";
+import { productTitle } from "@/lib/product-config";
 import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Clareza — Organização financeira para o seu negócio" },
+      { title: productTitle("Organização financeira para o seu negócio") },
       {
         name: "description",
         content:
