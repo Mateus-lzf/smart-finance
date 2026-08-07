@@ -35,6 +35,29 @@ export function normalizeImportHeader(value: unknown) {
     .trim();
 }
 
+export function isSupportedImportFile(file: Pick<File, "name">) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return extension === "csv" || extension === "xlsx";
+}
+
+export function getImportUploadFile(files?: ArrayLike<File> | null) {
+  return files?.[0];
+}
+
+const supportedImportMimeTypes = new Set([
+  "text/csv",
+  "application/csv",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+export function hasSupportedImportDrag(transfer: Pick<DataTransfer, "files" | "items">) {
+  const file = getImportUploadFile(transfer.files);
+  if (file) return isSupportedImportFile(file);
+  return Array.from(transfer.items ?? []).some(
+    (item) => item.kind === "file" && supportedImportMimeTypes.has(item.type.toLowerCase()),
+  );
+}
+
 function detectMapping(headers: string[]): ColumnMapping {
   return Object.fromEntries(
     importFields.map(({ key }) => {
@@ -46,7 +69,7 @@ function detectMapping(headers: string[]): ColumnMapping {
 
 export async function readImportFile(file: File): Promise<ImportPreview> {
   const extension = file.name.split(".").pop()?.toLowerCase();
-  if (!extension || !["csv", "xlsx"].includes(extension)) {
+  if (!isSupportedImportFile(file)) {
     throw new Error("Formato inválido. Selecione um arquivo CSV ou XLSX.");
   }
   let matrix: unknown[][];

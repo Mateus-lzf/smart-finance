@@ -6,7 +6,14 @@ import type {
   ImportPreview,
   TransactionUpdateComparison,
 } from "@/lib/finance-types";
-import { importFields, normalizeImportedRows, readImportFile } from "@/lib/import-service";
+import {
+  getImportUploadFile,
+  hasSupportedImportDrag,
+  importFields,
+  normalizeImportedRows,
+  readImportFile,
+} from "@/lib/import-service";
+import { cn } from "@/lib/utils";
 import { compareTransactionUpdates, reuseImportMapping } from "@/lib/transaction-update-service";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +36,7 @@ export function DataUpdateDialog() {
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [comparison, setComparison] = useState<TransactionUpdateComparison | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reset = () => {
@@ -38,6 +46,7 @@ export function DataUpdateDialog() {
     setComparison(null);
     setError(null);
     setLoading(false);
+    setDragging(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -106,21 +115,38 @@ export function DataUpdateDialog() {
           )}
 
           {stage === "file" && (
-            <label className="flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border px-6 py-10 text-center">
+            <label
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragging(hasSupportedImportDrag(event.dataTransfer));
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                void readFile(getImportUploadFile(event.dataTransfer.files));
+              }}
+              className={cn(
+                "flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed border-border px-6 py-10 text-center transition-colors",
+                dragging && "border-primary/60 bg-accent/40",
+              )}
+            >
               {loading ? (
                 <Loader2 className="size-7 animate-spin text-primary" />
               ) : (
                 <FileSpreadsheet className="size-7 text-primary" />
               )}
-              <span className="font-medium">Selecione a nova versão da planilha</span>
-              <span className="text-sm text-muted-foreground">Arquivo CSV ou XLSX</span>
+              <span className="font-medium">Arraste a nova versão da planilha aqui</span>
+              <span className="text-sm text-muted-foreground">
+                ou clique para selecionar um arquivo CSV ou XLSX
+              </span>
               <input
                 ref={inputRef}
                 type="file"
                 accept=".csv,.xlsx"
                 className="sr-only"
                 disabled={loading}
-                onChange={(event) => void readFile(event.target.files?.[0])}
+                onChange={(event) => void readFile(getImportUploadFile(event.target.files))}
               />
             </label>
           )}
@@ -225,7 +251,8 @@ export function DataUpdateDialog() {
               {comparison.possibleDuplicates.length > 0 && (
                 <p className="flex gap-2 rounded-xl bg-warning/10 p-3 text-sm text-foreground">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-                  Linhas exatamente repetidas foram identificadas e não serão duplicadas.
+                  Linhas exatamente repetidas foram identificadas como possíveis duplicatas. Todas
+                  serão preservadas na atualização.
                 </p>
               )}
               <p className="text-sm text-muted-foreground">

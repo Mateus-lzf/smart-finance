@@ -75,6 +75,30 @@ try {
   assert.equal(finance.parseCurrencyInput("− R$ 2.500,50"), 2500.5);
   console.log("Importação CSV: OK");
 
+  const selectedFile = new File([csv], "selecionado.csv");
+  const droppedFile = new File([csv], "arrastado.csv");
+  assert.equal(importer.getImportUploadFile({ 0: selectedFile, length: 1 }), selectedFile);
+  assert.equal(importer.getImportUploadFile({ 0: droppedFile, length: 1 }), droppedFile);
+  assert.equal(importer.isSupportedImportFile(selectedFile), true);
+  assert.equal(importer.isSupportedImportFile(new File(["x"], "invalido.pdf")), false);
+  assert.equal(
+    importer.hasSupportedImportDrag({
+      files: { length: 0 },
+      items: [{ kind: "file", type: "text/csv" }],
+    }),
+    true,
+  );
+  assert.equal(
+    importer.hasSupportedImportDrag({
+      files: { length: 0 },
+      items: [{ kind: "file", type: "application/pdf" }],
+    }),
+    false,
+  );
+  assert.equal((await importer.readImportFile(selectedFile)).rows.length, 2);
+  assert.equal((await importer.readImportFile(droppedFile)).rows.length, 2);
+  console.log("Upload por seleção e drag-and-drop usam o mesmo processamento: OK");
+
   const createdProject = projectService.createLocalProject(
     { name: "  Projeto real  ", type: " Serviços ", description: " Controle local " },
     { id: "project-1", now: "2026-08-06T00:00:00.000Z" },
@@ -160,10 +184,14 @@ try {
   assert.equal(comparison.changed.length, 1, "alteração de valor deve ser identificada");
   assert.equal(comparison.changed[0].before.amount, 2500);
   assert.equal(comparison.changed[0].after.amount, 3000);
-  assert.equal(comparison.added.length, 1, "nova linha deve ser identificada");
+  assert.equal(comparison.added.length, 2, "todas as novas linhas devem ser identificadas");
   assert.equal(comparison.removed.length, 1, "linha ausente deve ser removida");
   assert.equal(comparison.possibleDuplicates.length, 1);
-  assert.equal(comparison.nextTransactions.length, 2, "duplicata não deve entrar no resultado");
+  assert.equal(
+    comparison.nextTransactions.length,
+    3,
+    "linha repetida legítima deve ser preservada",
+  );
   assert.equal(
     new Set(comparison.nextTransactions.map(updateService.transactionFingerprint)).size,
     2,
@@ -173,8 +201,44 @@ try {
     [2500, 1000],
     "comparação/cancelamento não pode mutar dados atuais",
   );
-  assert.equal(finance.kpisFromTransactions(comparison.nextTransactions).saldo.value, 2750);
+  assert.equal(finance.kpisFromTransactions(comparison.nextTransactions).saldo.value, 2500);
   console.log("Atualização, inclusão, alteração, remoção e duplicatas: OK");
+
+  const repeatedBase = {
+    id: "uber-1",
+    date: "2026-08-10",
+    description: "Uber",
+    category: "Transporte",
+    method: "Importado",
+    type: "despesa",
+    amount: 25,
+    status: "Pago",
+  };
+  const legitimateRepeatedRows = [repeatedBase, { ...repeatedBase, id: "uber-2" }];
+  const repeatedComparison = updateService.compareTransactionUpdates([], legitimateRepeatedRows);
+  assert.equal(repeatedComparison.possibleDuplicates.length, 1);
+  assert.equal(repeatedComparison.added.length, 2);
+  assert.equal(repeatedComparison.nextTransactions.length, 2);
+  assert.deepEqual(
+    repeatedComparison.nextTransactions.map((row) => row.id),
+    ["uber-1", "uber-2"],
+    "possíveis duplicatas nunca podem ser removidas silenciosamente",
+  );
+
+  const repeatedRefresh = updateService.compareTransactionUpdates(
+    legitimateRepeatedRows,
+    legitimateRepeatedRows.map((row, index) => ({ ...row, id: `import-${index}` })),
+  );
+  assert.equal(repeatedRefresh.unchanged.length, 2);
+  assert.equal(repeatedRefresh.added.length, 0);
+  assert.equal(repeatedRefresh.removed.length, 0);
+  assert.equal(repeatedRefresh.nextTransactions.length, 2);
+  assert.deepEqual(
+    repeatedRefresh.nextTransactions.map((row) => row.id).sort(),
+    ["uber-1", "uber-2"],
+    "reimportar as mesmas ocorrências deve preservar IDs sem criar linhas extras",
+  );
+  console.log("Duplicatas legítimas preservadas e comparação por ocorrência: OK");
 
   const persisted = localState.serializeLocalState({
     projects: [createdProject],

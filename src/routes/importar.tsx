@@ -14,7 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { importFields, normalizeImportedRows, readImportFile } from "@/lib/import-service";
+import {
+  importFields,
+  getImportUploadFile,
+  hasSupportedImportDrag,
+  normalizeImportedRows,
+  readImportFile,
+} from "@/lib/import-service";
 import type { ColumnMapping, ImportPreview } from "@/lib/finance-types";
 
 export const Route = createFileRoute("/importar")({
@@ -212,13 +218,13 @@ function ImportPage() {
               <label
                 onDragOver={(event) => {
                   event.preventDefault();
-                  setDragging(true);
+                  setDragging(hasSupportedImportDrag(event.dataTransfer));
                 }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={(event) => {
                   event.preventDefault();
                   setDragging(false);
-                  const file = event.dataTransfer.files?.[0];
+                  const file = getImportUploadFile(event.dataTransfer.files);
                   if (file) void start(file);
                 }}
                 className={cn(
@@ -236,7 +242,7 @@ function ImportPage() {
                   className="hidden"
                   accept=".csv,.xlsx"
                   onChange={(event) => {
-                    const file = event.target.files?.[0];
+                    const file = getImportUploadFile(event.target.files);
                     if (file) void start(file);
                     event.target.value = "";
                   }}

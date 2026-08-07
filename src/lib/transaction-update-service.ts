@@ -69,18 +69,17 @@ export function compareTransactionUpdates(
 ): TransactionUpdateComparison {
   const seenFingerprints = new Set<string>();
   const possibleDuplicates: Transaction[] = [];
-  const uniqueImported = imported.filter((row) => {
+  imported.forEach((row) => {
     const fingerprint = transactionFingerprint(row);
     if (seenFingerprints.has(fingerprint)) {
       possibleDuplicates.push(row);
-      return false;
+    } else {
+      seenFingerprints.add(fingerprint);
     }
-    seenFingerprints.add(fingerprint);
-    return true;
   });
 
   const currentGroups = groupByIdentity(current);
-  const importedGroups = groupByIdentity(uniqueImported);
+  const importedGroups = groupByIdentity(imported);
   const added: Transaction[] = [];
   const changed: TransactionUpdateComparison["changed"] = [];
   const unchanged: Transaction[] = [];
@@ -127,6 +126,6 @@ export function compareTransactionUpdates(
     unchanged,
     removed,
     possibleDuplicates,
-    nextTransactions: uniqueImported.map((row) => resolvedByImportedId.get(row.id) ?? row),
+    nextTransactions: imported.map((row) => resolvedByImportedId.get(row.id) ?? row),
   };
 }
