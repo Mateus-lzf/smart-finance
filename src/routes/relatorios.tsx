@@ -16,7 +16,10 @@ export const Route = createFileRoute("/relatorios")({
         content: "Resumos financeiros calculados a partir dos lançamentos do projeto.",
       },
       { property: "og:title", content: "Relatórios financeiros — Clareza" },
-      { property: "og:description", content: "Relatórios prontos, escritos em linguagem simples." },
+      {
+        property: "og:description",
+        content: "Resumos calculados a partir dos lançamentos do projeto.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -31,11 +34,6 @@ const reports = [
     desc: "Visão consolidada de receitas, despesas, lucro e saldo.",
   },
   {
-    icon: CalendarRange,
-    title: "Resumo Semanal",
-    desc: "Lançamentos registrados nos últimos sete dias.",
-  },
-  {
     icon: Wallet,
     title: "Fluxo de Caixa",
     desc: "Entradas, saídas e saldo acumulado do período.",
@@ -48,7 +46,7 @@ const reports = [
   {
     icon: TrendingDown,
     title: "Despesas",
-    desc: "Todas as saídas agrupadas por categoria e fornecedor.",
+    desc: "Despesas registradas e agrupadas por categoria.",
   },
 ];
 
@@ -66,10 +64,7 @@ function RelatoriosPage() {
   const cur = s[s.length - 1] ?? { month: "Sem dados" };
 
   return (
-    <AppShell
-      title="Relatórios"
-      description={`Prontos para enviar ao contador ou ao sócio · ${project.name}`}
-    >
+    <AppShell title="Relatórios" description={`Resumos financeiros de ${project.name}`}>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           {reports.map((r) => (

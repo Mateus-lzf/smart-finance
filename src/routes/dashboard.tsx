@@ -95,7 +95,7 @@ function Dashboard() {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <Panel title="Fluxo de caixa" subtitle="Saldo acumulado projetado">
+            <Panel title="Fluxo de caixa" subtitle="Saldo acumulado">
               <CashFlowArea height={220} />
             </Panel>
             <Panel title="Categorias de despesa">

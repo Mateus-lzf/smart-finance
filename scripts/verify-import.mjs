@@ -57,6 +57,9 @@ try {
   const projectService = await vite.ssrLoadModule("/src/lib/project-service.ts");
   const transactionService = await vite.ssrLoadModule("/src/lib/transaction-service.ts");
   const calendarDate = await vite.ssrLoadModule("/src/lib/calendar-date.ts");
+  const updateService = await vite.ssrLoadModule("/src/lib/transaction-update-service.ts");
+  const localState = await vite.ssrLoadModule("/src/lib/local-state-service.ts");
+  const navigation = await vite.ssrLoadModule("/src/lib/app-navigation.ts");
   const csv = [
     "Data;Descrição;Categoria;Tipo;Valor",
     '01/07/2026;"Venda, balcão";Vendas;Receita;2.500,00',
@@ -135,6 +138,73 @@ try {
   const deleted = transactionService.deleteLocalTransaction(updated, xlsxRows[0].id);
   assert.equal(deleted.length, 0);
   console.log("CRUD de lançamentos e recálculo financeiro: OK");
+
+  const initial = [
+    { ...csvRows[0], id: "old-1" },
+    { ...csvRows[1], id: "old-2" },
+  ];
+  const nextCsv = [
+    "Data;Descrição;Categoria;Tipo;Valor",
+    '01/07/2026;"Venda, balcão";Vendas;Receita;3.000,00',
+    "03/07/2026;Energia;Fixos;Despesa;250,00",
+    "03/07/2026;Energia;Fixos;Despesa;250,00",
+  ].join("\n");
+  const nextPreview = await importer.readImportFile(new File([nextCsv], "dados-atualizados.csv"));
+  const reusedMapping = updateService.reuseImportMapping(nextPreview, {
+    headers: csvPreview.headers,
+    mapping: csvPreview.mapping,
+  });
+  assert.deepEqual(reusedMapping, nextPreview.mapping);
+  const nextRows = importer.normalizeImportedRows(nextPreview, reusedMapping);
+  const comparison = updateService.compareTransactionUpdates(initial, nextRows);
+  assert.equal(comparison.changed.length, 1, "alteração de valor deve ser identificada");
+  assert.equal(comparison.changed[0].before.amount, 2500);
+  assert.equal(comparison.changed[0].after.amount, 3000);
+  assert.equal(comparison.added.length, 1, "nova linha deve ser identificada");
+  assert.equal(comparison.removed.length, 1, "linha ausente deve ser removida");
+  assert.equal(comparison.possibleDuplicates.length, 1);
+  assert.equal(comparison.nextTransactions.length, 2, "duplicata não deve entrar no resultado");
+  assert.equal(
+    new Set(comparison.nextTransactions.map(updateService.transactionFingerprint)).size,
+    2,
+  );
+  assert.deepEqual(
+    initial.map((row) => row.amount),
+    [2500, 1000],
+    "comparação/cancelamento não pode mutar dados atuais",
+  );
+  assert.equal(finance.kpisFromTransactions(comparison.nextTransactions).saldo.value, 2750);
+  console.log("Atualização, inclusão, alteração, remoção e duplicatas: OK");
+
+  const persisted = localState.serializeLocalState({
+    projects: [createdProject],
+    activeProjectId: createdProject.id,
+    transactionsByProject: { [createdProject.id]: comparison.nextTransactions },
+    importProfilesByProject: {
+      [createdProject.id]: { headers: nextPreview.headers, mapping: reusedMapping },
+    },
+  });
+  const reloaded = localState.parseLocalState(persisted);
+  assert.deepEqual(reloaded.transactionsByProject[createdProject.id], comparison.nextTransactions);
+  assert.deepEqual(reloaded.importProfilesByProject[createdProject.id].mapping, reusedMapping);
+
+  const intactBeforeInvalid = structuredClone(initial);
+  await assert.rejects(
+    () => importer.readImportFile(new File(["sem dados"], "invalido.txt")),
+    /Formato inválido/,
+  );
+  assert.deepEqual(
+    initial,
+    intactBeforeInvalid,
+    "arquivo inválido não pode alterar os dados atuais",
+  );
+  console.log("Persistência, cancelamento e arquivo inválido sem perda: OK");
+
+  assert.deepEqual(
+    navigation.appNavigation.map((item) => item.to),
+    ["/projetos", "/dashboard", "/dados", "/insights", "/relatorios", "/configuracoes"],
+  );
+  console.log("Navegação móvel compartilha todas as rotas principais: OK");
 } finally {
   await vite.close();
 }

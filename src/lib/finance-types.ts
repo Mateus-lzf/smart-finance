@@ -42,6 +42,25 @@ export type ImportPreview = {
   missingFields: ImportField[];
 };
 
+export type ImportProfile = {
+  headers: string[];
+  mapping: ColumnMapping;
+};
+
+export type TransactionChange = {
+  before: Transaction;
+  after: Transaction;
+};
+
+export type TransactionUpdateComparison = {
+  added: Transaction[];
+  changed: TransactionChange[];
+  unchanged: Transaction[];
+  removed: Transaction[];
+  possibleDuplicates: Transaction[];
+  nextTransactions: Transaction[];
+};
+
 export type MonthPoint = {
   month: string;
   receita: number;

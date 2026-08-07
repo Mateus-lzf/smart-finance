@@ -7,21 +7,19 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Project, ProjectInput, Transaction } from "./finance-types";
+import type { ImportProfile, Project, ProjectInput, Transaction } from "./finance-types";
+import {
+  LOCAL_STATE_KEY,
+  parseLocalState,
+  serializeLocalState,
+  type LocalState,
+} from "./local-state-service";
 import { createLocalProject, updateLocalProject } from "./project-service";
 import {
   addLocalTransaction,
   deleteLocalTransaction,
   updateLocalTransaction,
 } from "./transaction-service";
-
-const STORAGE_KEY = "clareza.local-state.v2";
-
-type PersistedState = {
-  projects: Project[];
-  activeProjectId: string | null;
-  transactionsByProject: Record<string, Transaction[]>;
-};
 
 type AppState = {
   projects: Project[];
@@ -32,6 +30,8 @@ type AppState = {
   updateProject: (id: string, input: ProjectInput) => void;
   deleteProject: (id: string) => void;
   getProjectTransactions: (id: string) => Transaction[];
+  importProfile: ImportProfile | null;
+  setImportProfile: (profile: ImportProfile, targetProjectId?: string) => void;
   onboarded: boolean;
   setOnboarded: (value: boolean) => void;
   aiOpen: boolean;
@@ -52,6 +52,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [transactionsByProject, setTransactionsByProject] = useState<Record<string, Transaction[]>>(
     {},
   );
+  const [importProfilesByProject, setImportProfilesByProject] = useState<
+    Record<string, ImportProfile>
+  >({});
   const [onboarded, setOnboarded] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -59,12 +62,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       localStorage.removeItem("fin.state");
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(LOCAL_STATE_KEY);
       if (raw) {
-        const state = JSON.parse(raw) as Partial<PersistedState>;
-        const storedProjects = Array.isArray(state.projects) ? state.projects : [];
+        const state = parseLocalState(raw);
+        const storedProjects = state.projects;
         setProjects(storedProjects);
-        setTransactionsByProject(state.transactionsByProject ?? {});
+        setTransactionsByProject(state.transactionsByProject);
+        setImportProfilesByProject(state.importProfilesByProject);
         const activeId = storedProjects.some((project) => project.id === state.activeProjectId)
           ? (state.activeProjectId ?? null)
           : (storedProjects[0]?.id ?? null);
@@ -79,17 +83,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return;
-    const state: PersistedState = {
+    const state: LocalState = {
       projects,
       activeProjectId: projectId,
       transactionsByProject,
+      importProfilesByProject,
     };
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      localStorage.setItem(LOCAL_STATE_KEY, serializeLocalState(state));
     } catch {
       // The current session keeps working if storage is unavailable or full.
     }
-  }, [projects, projectId, transactionsByProject, hydrated]);
+  }, [projects, projectId, transactionsByProject, importProfilesByProject, hydrated]);
 
   const setProjectId = useCallback(
     (id: string) => {
@@ -125,7 +130,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       void removed;
       return next;
     });
+    setImportProfilesByProject((current) => {
+      const { [id]: removed, ...next } = current;
+      void removed;
+      return next;
+    });
   }, []);
+
+  const setImportProfile = useCallback(
+    (profile: ImportProfile, targetProjectId?: string) => {
+      const id = targetProjectId ?? projectId;
+      if (!id) return;
+      setImportProfilesByProject((current) => ({ ...current, [id]: profile }));
+    },
+    [projectId],
+  );
 
   const replaceTransactions = useCallback(
     (rows: Transaction[], targetProjectId?: string) => {
@@ -194,6 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [transactionsByProject],
   );
   const project = projects.find((item) => item.id === projectId) ?? null;
+  const importProfile = projectId ? (importProfilesByProject[projectId] ?? null) : null;
   const transactions = useMemo(
     () => (projectId ? (transactionsByProject[projectId] ?? []) : []),
     [projectId, transactionsByProject],
@@ -209,6 +229,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateProject,
       deleteProject,
       getProjectTransactions,
+      importProfile,
+      setImportProfile,
       onboarded,
       setOnboarded,
       aiOpen,
@@ -229,6 +251,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateProject,
       deleteProject,
       getProjectTransactions,
+      importProfile,
+      setImportProfile,
       onboarded,
       aiOpen,
       hydrated,

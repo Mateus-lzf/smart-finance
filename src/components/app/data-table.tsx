@@ -8,6 +8,7 @@ import { parseCurrencyInput } from "@/lib/finance-service";
 import { formatCalendarDate, todayCalendarDate } from "@/lib/calendar-date";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { DataUpdateDialog } from "./data-update-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -137,6 +138,7 @@ export function DataTable() {
         <Button variant="outline" size="sm" className="gap-1.5" onClick={addRow}>
           <Plus className="size-3.5" /> Nova linha
         </Button>
+        <DataUpdateDialog />
         <Button size="sm" className="gap-1.5" asChild>
           <Link to="/importar">
             <Upload className="size-3.5" /> Importar planilha

@@ -1,10 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  BarChart3,
-  Table2,
-  Lightbulb,
-  FileText,
-  Settings,
   FolderKanban,
   Sparkles,
   PanelLeftClose,
@@ -12,11 +7,14 @@ import {
   Check,
   ChevronsUpDown,
   Plus,
+  Menu,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-store";
+import { appNavigation } from "@/lib/app-navigation";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,15 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-const nav = [
-  { to: "/projetos", label: "Projetos", icon: FolderKanban },
-  { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
-  { to: "/dados", label: "Dados", icon: Table2 },
-  { to: "/insights", label: "Insights", icon: Lightbulb },
-  { to: "/relatorios", label: "Relatórios", icon: FileText },
-  { to: "/configuracoes", label: "Configurações", icon: Settings },
-] as const;
 
 function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   const { project, projects, setProjectId } = useApp();
@@ -112,6 +101,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   return (
@@ -138,7 +128,7 @@ export function AppShell({
         </div>
 
         <nav className="mt-4 flex flex-1 flex-col gap-0.5 px-2">
-          {nav.map((item) => {
+          {appNavigation.map((item) => {
             const active = pathname.startsWith(item.to);
             return (
               <Link
@@ -181,11 +171,20 @@ export function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur-xl">
           <div className="flex flex-wrap items-end justify-between gap-3 px-5 py-4 md:px-8">
-            <div className="min-w-0">
-              <h1 className="truncate text-[22px] font-semibold tracking-tight">{title}</h1>
-              {description && (
-                <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
-              )}
+            <div className="flex min-w-0 items-center gap-3">
+              <button
+                className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-card md:hidden"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Abrir menu"
+              >
+                <Menu className="size-4" />
+              </button>
+              <div className="min-w-0">
+                <h1 className="truncate text-[22px] font-semibold tracking-tight">{title}</h1>
+                {description && (
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{description}</p>
+                )}
+              </div>
             </div>
             {actions && <div className="flex items-center gap-2">{actions}</div>}
           </div>
@@ -203,6 +202,40 @@ export function AppShell({
           </motion.main>
         </AnimatePresence>
       </div>
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="w-[280px] bg-sidebar p-3">
+          <SheetHeader className="px-1 py-2 text-left">
+            <SheetTitle className="flex items-center gap-2 text-[15px]">
+              <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+                <Sparkles className="size-4" />
+              </span>
+              Clareza<span className="-ml-2 text-primary">.</span>
+            </SheetTitle>
+          </SheetHeader>
+          <div className="mt-2">
+            <ProjectSwitcher collapsed={false} />
+          </div>
+          <nav className="mt-4 flex flex-col gap-1">
+            {appNavigation.map((item) => {
+              const active = pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMobileOpen(false)}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/80",
+                    active && "bg-sidebar-accent font-medium text-sidebar-foreground",
+                  )}
+                >
+                  <item.icon className={cn("size-4", active && "text-primary")} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

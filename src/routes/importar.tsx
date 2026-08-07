@@ -37,7 +37,7 @@ const steps = [
 
 function ImportPage() {
   const navigate = useNavigate();
-  const { project, createProject, setOnboarded, replaceTransactions } = useApp();
+  const { project, createProject, setOnboarded, replaceTransactions, setImportProfile } = useApp();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -56,6 +56,7 @@ function ImportPage() {
       const targetProject = project ?? createProject({ name: newProjectName });
       setStep(3);
       replaceTransactions(rows, targetProject.id);
+      setImportProfile({ headers: parsed.headers, mapping: selectedMapping }, targetProject.id);
       setStep(4);
       setOnboarded(true);
       await new Promise((resolve) => setTimeout(resolve, 450));

@@ -25,7 +25,7 @@ const aliases: Record<ImportField, string[]> = {
   amount: ["valor", "value", "amount", "montante", "total", "quantia"],
 };
 
-function normalized(value: unknown) {
+export function normalizeImportHeader(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -38,7 +38,7 @@ function normalized(value: unknown) {
 function detectMapping(headers: string[]): ColumnMapping {
   return Object.fromEntries(
     importFields.map(({ key }) => {
-      const match = headers.find((header) => aliases[key].includes(normalized(header)));
+      const match = headers.find((header) => aliases[key].includes(normalizeImportHeader(header)));
       return [key, match ?? ""];
     }),
   ) as ColumnMapping;
@@ -117,7 +117,7 @@ function parseAmount(value: unknown): number | null {
 }
 
 function parseType(value: unknown, originalAmount: unknown): TransactionType | null {
-  const text = normalized(value);
+  const text = normalizeImportHeader(value);
   if (["receita", "entrada", "credito", "credit", "income", "r"].includes(text)) return "receita";
   if (["despesa", "saida", "debito", "debit", "expense", "d"].includes(text)) return "despesa";
   const amount =
