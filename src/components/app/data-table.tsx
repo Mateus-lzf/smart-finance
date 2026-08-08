@@ -48,7 +48,7 @@ function EditableCell({
           }
         }}
         className={cn(
-          "w-full rounded-md border border-primary/50 bg-card px-1.5 py-0.5 text-sm outline-none",
+          "w-full rounded-md border border-primary/50 bg-card px-1.5 py-0.5 text-left text-sm outline-none",
           align === "right" && "text-right",
         )}
       />
@@ -57,7 +57,7 @@ function EditableCell({
     <button
       onClick={() => setEditing(true)}
       className={cn(
-        "-mx-1.5 w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 text-sm transition-colors hover:bg-muted",
+        "-mx-1.5 w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-muted",
         align === "right" && "text-right",
       )}
     >
@@ -151,13 +151,13 @@ export function DataTable() {
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 font-medium">Data</th>
-                <th className="px-4 py-2.5 font-medium">Descrição</th>
-                <th className="px-4 py-2.5 font-medium">Categoria</th>
-                <th className="px-4 py-2.5 font-medium">Pagamento</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5 text-left font-medium">Data</th>
+                <th className="px-4 py-2.5 text-left font-medium">Descrição</th>
+                <th className="px-4 py-2.5 text-left font-medium">Categoria</th>
+                <th className="px-4 py-2.5 text-left font-medium">Pagamento</th>
+                <th className="px-4 py-2.5 text-center font-medium">Status</th>
                 <th className="px-4 py-2.5 text-right font-medium">Valor</th>
-                <th className="w-12 px-2 py-2.5">
+                <th className="w-12 px-2 py-2.5 text-right">
                   <span className="sr-only">Ações</span>
                 </th>
               </tr>
@@ -168,25 +168,25 @@ export function DataTable() {
                   key={r.id}
                   className="border-b border-border/70 last:border-0 hover:bg-muted/30"
                 >
-                  <td className="tabular px-4 py-2 text-muted-foreground">
+                  <td className="tabular px-4 py-2 text-left text-muted-foreground">
                     {formatCalendarDate(r.date)}
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 text-left">
                     <EditableCell
                       value={r.description}
                       onChange={(v) => patch(r.id, "description", v)}
                     />
                   </td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 text-left">
                     <EditableCell value={r.category} onChange={(v) => patch(r.id, "category", v)} />
                   </td>
-                  <td className="px-4 py-2 text-muted-foreground">{r.method}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 text-left text-muted-foreground">{r.method}</td>
+                  <td className="px-4 py-2 text-center">
                     <span
                       className={cn(
                         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
                         r.status === "Pago" && "bg-accent text-accent-foreground",
-                        r.status === "Pendente" && "bg-muted text-muted-foreground",
+                        r.status === "Pendente" && "bg-warning/15 text-warning",
                         r.status === "Atrasado" && "bg-destructive/10 text-destructive",
                       )}
                     >

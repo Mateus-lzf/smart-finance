@@ -32,11 +32,11 @@ function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
       <Link
         to="/projetos"
         className={cn(
-          "flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent",
+          "flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground",
           collapsed && "justify-center px-0",
         )}
       >
-        <span className="grid size-8 place-items-center rounded-lg bg-card shadow-soft">
+        <span className="grid size-8 place-items-center rounded-lg bg-sidebar-hover text-sidebar-primary">
           <FolderKanban className="size-4" />
         </span>
         {!collapsed && <span>Criar projeto</span>}
@@ -48,22 +48,22 @@ function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
       <DropdownMenuTrigger asChild>
         <button
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-xl border border-transparent px-2 py-2 text-left transition-colors hover:bg-sidebar-accent",
+            "flex w-full items-center gap-2.5 rounded-xl border border-sidebar-border px-2 py-2 text-left text-sidebar-foreground transition-colors hover:bg-sidebar-hover",
             collapsed && "justify-center px-0",
           )}
         >
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-card text-base shadow-soft">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-sidebar-hover text-sidebar-primary">
             <FolderKanban className="size-4" />
           </span>
           {!collapsed && (
             <>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{project.name}</span>
-                <span className="block truncate text-xs text-muted-foreground">
+                <span className="block truncate text-xs text-sidebar-foreground/65">
                   {project.type || "Projeto financeiro"}
                 </span>
               </span>
-              <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+              <ChevronsUpDown className="size-3.5 shrink-0 text-sidebar-foreground/60" />
             </>
           )}
         </button>
@@ -114,7 +114,7 @@ export function AppShell({
         )}
       >
         <div className="flex items-center gap-2 px-3 py-4">
-          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
+          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
             <Sparkles className="size-4" />
           </div>
           {!collapsed && (
@@ -134,18 +134,18 @@ export function AppShell({
                 key={item.to}
                 to={item.to}
                 className={cn(
-                  "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  active && "bg-sidebar-accent font-medium text-sidebar-foreground",
+                  "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground",
+                  active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
                   collapsed && "justify-center px-0",
                 )}
                 title={item.label}
               >
-                <item.icon className={cn("size-4 shrink-0", active && "text-primary")} />
+                <item.icon className={cn("size-4 shrink-0", active && "text-sidebar-primary")} />
                 {!collapsed && <span>{item.label}</span>}
                 {active && (
                   <motion.span
                     layoutId="nav-active"
-                    className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+                    className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-sidebar-primary"
                   />
                 )}
               </Link>
@@ -157,7 +157,7 @@ export function AppShell({
           <button
             onClick={() => setCollapsed((c) => !c)}
             className={cn(
-              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent",
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground",
               collapsed && "justify-center px-0",
             )}
           >
@@ -195,7 +195,7 @@ export function AppShell({
         <SheetContent side="left" className="w-[280px] bg-sidebar p-3">
           <SheetHeader className="px-1 py-2 text-left">
             <SheetTitle className="flex items-center gap-2 text-[15px]">
-              <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+              <span className="grid size-8 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <Sparkles className="size-4" />
               </span>
               {PRODUCT_NAME}
@@ -213,11 +213,11 @@ export function AppShell({
                   to={item.to}
                   onClick={() => setMobileOpen(false)}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/80",
-                    active && "bg-sidebar-accent font-medium text-sidebar-foreground",
+                    "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground",
+                    active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
                   )}
                 >
-                  <item.icon className={cn("size-4", active && "text-primary")} />
+                  <item.icon className={cn("size-4", active && "text-sidebar-primary")} />
                   {item.label}
                 </Link>
               );

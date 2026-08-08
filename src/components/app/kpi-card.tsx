@@ -18,7 +18,8 @@ export function KpiCard({
   const up = delta >= 0;
   const good = positiveIsGood ? up : !up;
   return (
-    <div className="surface group p-4 transition-shadow hover:shadow-lift">
+    <div className="surface group relative overflow-hidden p-4 transition-shadow hover:shadow-lift">
+      <span className="absolute left-4 top-0 h-0.5 w-10 rounded-b-full bg-primary/70" />
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="tabular mt-2 text-2xl font-semibold tracking-tight">{brl(value, true)}</p>
       <div className="mt-2 flex items-center gap-1.5">
