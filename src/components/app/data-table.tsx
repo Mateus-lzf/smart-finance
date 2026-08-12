@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Plus, Upload, Filter, Check, Trash2 } from "lucide-react";
+import { Search, Plus, Upload, Filter, Columns3, Trash2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { useApp } from "@/lib/app-store";
 import { brl } from "@/lib/mock-data";
@@ -67,7 +67,15 @@ function EditableCell({
 }
 
 export function DataTable() {
-  const { transactions: rows, updateTransaction, addTransaction, deleteTransaction } = useApp();
+  const {
+    transactions: rows,
+    importProfile,
+    visibleColumns,
+    setVisibleColumns,
+    updateTransaction,
+    addTransaction,
+    deleteTransaction,
+  } = useApp();
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>({ receita: true, despesa: true });
 
@@ -77,7 +85,7 @@ export function DataTable() {
         (r) =>
           filters[r.type] &&
           (query === "" ||
-            `${r.description} ${r.category} ${r.method} ${r.id}`
+            `${r.description} ${r.category} ${Object.values(r.additionalData ?? {}).join(" ")} ${r.id}`
               .toLowerCase()
               .includes(query.toLowerCase())),
       ),
@@ -95,11 +103,30 @@ export function DataTable() {
       date: todayCalendarDate(),
       description: "Novo lançamento",
       category: "Sem categoria",
-      method: "PIX",
       type: "despesa",
       amount: 0,
-      status: "Pendente",
     });
+
+  const coreColumns = [
+    { id: "date", label: "Data" },
+    { id: "description", label: "Descrição" },
+    { id: "category", label: "Categoria" },
+    { id: "type", label: "Tipo" },
+    { id: "amount", label: "Valor" },
+  ];
+  const mappedColumns = new Set(Object.values(importProfile?.mapping ?? {}));
+  const additionalColumns = (importProfile?.columns ?? [])
+    .filter((column) => !mappedColumns.has(column.id))
+    .map((column) => ({ id: column.id, label: column.header }));
+  const availableColumns = [...coreColumns, ...additionalColumns];
+  const selectedColumns = availableColumns.filter((column) => visibleColumns.includes(column.id));
+
+  const toggleColumn = (id: string, checked: boolean) => {
+    const next = checked
+      ? [...visibleColumns, id]
+      : visibleColumns.filter((column) => column !== id);
+    setVisibleColumns(next);
+  };
 
   return (
     <div className="space-y-4">
@@ -135,6 +162,27 @@ export function DataTable() {
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <Columns3 className="size-3.5" /> Colunas visíveis
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              Exibir na tabela
+            </DropdownMenuLabel>
+            {availableColumns.map((column) => (
+              <DropdownMenuCheckboxItem
+                key={column.id}
+                checked={visibleColumns.includes(column.id)}
+                onCheckedChange={(checked) => toggleColumn(column.id, Boolean(checked))}
+              >
+                {column.label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button variant="outline" size="sm" className="gap-1.5" onClick={addRow}>
           <Plus className="size-3.5" /> Nova linha
         </Button>
@@ -148,15 +196,20 @@ export function DataTable() {
 
       <div className="surface overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="px-4 py-2.5 text-left font-medium">Data</th>
-                <th className="px-4 py-2.5 text-left font-medium">Descrição</th>
-                <th className="px-4 py-2.5 text-left font-medium">Categoria</th>
-                <th className="px-4 py-2.5 text-left font-medium">Pagamento</th>
-                <th className="px-4 py-2.5 text-center font-medium">Status</th>
-                <th className="px-4 py-2.5 text-right font-medium">Valor</th>
+                {selectedColumns.map((column) => (
+                  <th
+                    key={column.id}
+                    className={cn(
+                      "px-4 py-2.5 font-medium",
+                      column.id === "amount" ? "text-right" : "text-left",
+                    )}
+                  >
+                    {column.label}
+                  </th>
+                ))}
                 <th className="w-12 px-2 py-2.5 text-right">
                   <span className="sr-only">Ações</span>
                 </th>
@@ -168,44 +221,69 @@ export function DataTable() {
                   key={r.id}
                   className="border-b border-border/70 last:border-0 hover:bg-muted/30"
                 >
-                  <td className="tabular px-4 py-2 text-left text-muted-foreground">
-                    {formatCalendarDate(r.date)}
-                  </td>
-                  <td className="px-4 py-2 text-left">
-                    <EditableCell
-                      value={r.description}
-                      onChange={(v) => patch(r.id, "description", v)}
-                    />
-                  </td>
-                  <td className="px-4 py-2 text-left">
-                    <EditableCell value={r.category} onChange={(v) => patch(r.id, "category", v)} />
-                  </td>
-                  <td className="px-4 py-2 text-left text-muted-foreground">{r.method}</td>
-                  <td className="px-4 py-2 text-center">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs",
-                        r.status === "Pago" && "bg-accent text-accent-foreground",
-                        r.status === "Pendente" && "bg-warning/15 text-warning",
-                        r.status === "Atrasado" && "bg-destructive/10 text-destructive",
-                      )}
-                    >
-                      {r.status === "Pago" && <Check className="size-3" />}
-                      {r.status}
-                    </span>
-                  </td>
-                  <td
-                    className={cn(
-                      "tabular px-4 py-2 text-right font-medium",
-                      r.type === "receita" ? "text-primary" : "text-foreground",
-                    )}
-                  >
-                    <EditableCell
-                      align="right"
-                      value={`${r.type === "receita" ? "+" : "−"} ${brl(r.amount)}`}
-                      onChange={(v) => patch(r.id, "amount", v)}
-                    />
-                  </td>
+                  {selectedColumns.map((column) => {
+                    if (column.id === "date")
+                      return (
+                        <td
+                          key={column.id}
+                          className="tabular px-4 py-2 text-left text-muted-foreground"
+                        >
+                          {formatCalendarDate(r.date)}
+                        </td>
+                      );
+                    if (column.id === "description")
+                      return (
+                        <td key={column.id} className="px-4 py-2 text-left">
+                          <EditableCell
+                            value={r.description}
+                            onChange={(value) => patch(r.id, "description", value)}
+                          />
+                        </td>
+                      );
+                    if (column.id === "category")
+                      return (
+                        <td key={column.id} className="px-4 py-2 text-left">
+                          <EditableCell
+                            value={r.category}
+                            onChange={(value) => patch(r.id, "category", value)}
+                          />
+                        </td>
+                      );
+                    if (column.id === "type")
+                      return (
+                        <td key={column.id} className="px-4 py-2 text-left capitalize">
+                          {r.type}
+                        </td>
+                      );
+                    if (column.id === "amount")
+                      return (
+                        <td
+                          key={column.id}
+                          className={cn(
+                            "tabular px-4 py-2 text-right font-medium",
+                            r.type === "receita" ? "text-primary" : "text-foreground",
+                          )}
+                        >
+                          <EditableCell
+                            align="right"
+                            value={`${r.type === "receita" ? "+" : "−"} ${brl(r.amount)}`}
+                            onChange={(value) => patch(r.id, "amount", value)}
+                          />
+                        </td>
+                      );
+                    const value = r.additionalData?.[column.id];
+                    return (
+                      <td
+                        key={column.id}
+                        className={cn(
+                          "max-w-64 truncate px-4 py-2",
+                          typeof value === "number" ? "text-right tabular-nums" : "text-left",
+                        )}
+                      >
+                        {value === null || value === undefined ? "—" : String(value)}
+                      </td>
+                    );
+                  })}
                   <td className="px-2 py-2 text-right">
                     <Button
                       variant="ghost"
@@ -224,7 +302,10 @@ export function DataTable() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td
+                    colSpan={selectedColumns.length + 1}
+                    className="px-4 py-10 text-center text-sm text-muted-foreground"
+                  >
                     Nenhum lançamento encontrado.
                   </td>
                 </tr>

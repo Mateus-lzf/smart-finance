@@ -33,20 +33,26 @@ type AppState = {
   deleteProject: (id: string) => void;
   getProjectTransactions: (id: string) => Transaction[];
   importProfile: ImportProfile | null;
-  setImportProfile: (profile: ImportProfile, targetProjectId?: string) => void;
+  visibleColumns: string[];
+  setVisibleColumns: (columns: string[]) => void;
+  commitImportedTransactions: (
+    rows: Transaction[],
+    profile: ImportProfile,
+    options?: { targetProjectId?: string; newProjectName?: string },
+  ) => Project;
   onboarded: boolean;
   setOnboarded: (value: boolean) => void;
   aiOpen: boolean;
   setAiOpen: (value: boolean) => void;
   hydrated: boolean;
   transactions: Transaction[];
-  replaceTransactions: (rows: Transaction[], targetProjectId?: string) => void;
   updateTransaction: (id: string, patch: Partial<Transaction>) => void;
   addTransaction: (row: Transaction) => void;
   deleteTransaction: (id: string) => void;
 };
 
 const Ctx = createContext<AppState | null>(null);
+const DEFAULT_VISIBLE_COLUMNS = ["date", "description", "category", "type", "amount"];
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -57,6 +63,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [importProfilesByProject, setImportProfilesByProject] = useState<
     Record<string, ImportProfile>
   >({});
+  const [visibleColumnsByProject, setVisibleColumnsByProject] = useState<Record<string, string[]>>(
+    {},
+  );
   const [onboarded, setOnboarded] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -78,6 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setProjects(storedProjects);
         setTransactionsByProject(state.transactionsByProject);
         setImportProfilesByProject(state.importProfilesByProject);
+        setVisibleColumnsByProject(state.visibleColumnsByProject);
         const activeId = storedProjects.some((project) => project.id === state.activeProjectId)
           ? (state.activeProjectId ?? null)
           : (storedProjects[0]?.id ?? null);
@@ -97,13 +107,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       activeProjectId: projectId,
       transactionsByProject,
       importProfilesByProject,
+      visibleColumnsByProject,
     };
     try {
       persistLocalState(localStorage, state);
     } catch {
       // The current session keeps working if storage is unavailable or full.
     }
-  }, [projects, projectId, transactionsByProject, importProfilesByProject, hydrated]);
+  }, [
+    projects,
+    projectId,
+    transactionsByProject,
+    importProfilesByProject,
+    visibleColumnsByProject,
+    hydrated,
+  ]);
 
   const setProjectId = useCallback(
     (id: string) => {
@@ -116,6 +134,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const project = createLocalProject(input);
     setProjects((current) => [...current, project]);
     setTransactionsByProject((current) => ({ ...current, [project.id]: [] }));
+    setVisibleColumnsByProject((current) => ({
+      ...current,
+      [project.id]: DEFAULT_VISIBLE_COLUMNS,
+    }));
     setProjectIdState(project.id);
     setOnboarded(true);
     return project;
@@ -135,6 +157,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           activeProjectId: projectId,
           transactionsByProject,
           importProfilesByProject,
+          visibleColumnsByProject,
         },
         id,
       );
@@ -147,32 +170,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProjectIdState(next.activeProjectId);
       setTransactionsByProject(next.transactionsByProject);
       setImportProfilesByProject(next.importProfilesByProject);
+      setVisibleColumnsByProject(next.visibleColumnsByProject);
       setOnboarded(next.projects.length > 0);
     },
-    [projects, projectId, transactionsByProject, importProfilesByProject],
+    [projects, projectId, transactionsByProject, importProfilesByProject, visibleColumnsByProject],
   );
 
-  const setImportProfile = useCallback(
-    (profile: ImportProfile, targetProjectId?: string) => {
-      const id = targetProjectId ?? projectId;
-      if (!id) return;
-      setImportProfilesByProject((current) => ({ ...current, [id]: profile }));
+  const setVisibleColumns = useCallback(
+    (columns: string[]) => {
+      if (!projectId) return;
+      setVisibleColumnsByProject((current) => ({ ...current, [projectId]: columns }));
     },
     [projectId],
   );
 
-  const replaceTransactions = useCallback(
-    (rows: Transaction[], targetProjectId?: string) => {
-      const id = targetProjectId ?? projectId;
-      if (!id) return;
-      setTransactionsByProject((current) => ({ ...current, [id]: rows }));
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === id ? { ...project, updatedAt: new Date().toISOString() } : project,
-        ),
-      );
+  const commitImportedTransactions = useCallback(
+    (
+      rows: Transaction[],
+      profile: ImportProfile,
+      options: { targetProjectId?: string; newProjectName?: string } = {},
+    ) => {
+      const existingId = options.targetProjectId ?? projectId;
+      const created = existingId
+        ? null
+        : createLocalProject({ name: options.newProjectName?.trim() ?? "" });
+      const id = existingId ?? created!.id;
+      const now = new Date().toISOString();
+      const nextProjects = created
+        ? [...projects, created]
+        : projects.map((item) => (item.id === id ? { ...item, updatedAt: now } : item));
+      const next: LocalState = {
+        projects: nextProjects,
+        activeProjectId: id,
+        transactionsByProject: { ...transactionsByProject, [id]: rows },
+        importProfilesByProject: { ...importProfilesByProject, [id]: profile },
+        visibleColumnsByProject: {
+          ...visibleColumnsByProject,
+          [id]: visibleColumnsByProject[id] ?? DEFAULT_VISIBLE_COLUMNS,
+        },
+      };
+      try {
+        persistLocalState(localStorage, next);
+      } catch (cause) {
+        const error = new Error(
+          "Não há capacidade de armazenamento local suficiente. Os dados atuais foram mantidos intactos.",
+        );
+        error.cause = cause;
+        throw error;
+      }
+      setProjects(next.projects);
+      setProjectIdState(id);
+      setTransactionsByProject(next.transactionsByProject);
+      setImportProfilesByProject(next.importProfilesByProject);
+      setVisibleColumnsByProject(next.visibleColumnsByProject);
+      setOnboarded(true);
+      return next.projects.find((item) => item.id === id)!;
     },
-    [projectId],
+    [projectId, projects, transactionsByProject, importProfilesByProject, visibleColumnsByProject],
   );
 
   const updateTransaction = useCallback(
@@ -229,6 +283,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const project = projects.find((item) => item.id === projectId) ?? null;
   const importProfile = projectId ? (importProfilesByProject[projectId] ?? null) : null;
+  const visibleColumns = useMemo(
+    () => (projectId ? (visibleColumnsByProject[projectId] ?? DEFAULT_VISIBLE_COLUMNS) : []),
+    [projectId, visibleColumnsByProject],
+  );
   const transactions = useMemo(
     () => (projectId ? (transactionsByProject[projectId] ?? []) : []),
     [projectId, transactionsByProject],
@@ -245,14 +303,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteProject,
       getProjectTransactions,
       importProfile,
-      setImportProfile,
+      visibleColumns,
+      setVisibleColumns,
+      commitImportedTransactions,
       onboarded,
       setOnboarded,
       aiOpen,
       setAiOpen,
       hydrated,
       transactions,
-      replaceTransactions,
       updateTransaction,
       addTransaction,
       deleteTransaction,
@@ -267,12 +326,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteProject,
       getProjectTransactions,
       importProfile,
-      setImportProfile,
+      visibleColumns,
+      setVisibleColumns,
+      commitImportedTransactions,
       onboarded,
       aiOpen,
       hydrated,
       transactions,
-      replaceTransactions,
       updateTransaction,
       addTransaction,
       deleteTransaction,

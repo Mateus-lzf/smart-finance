@@ -22,18 +22,20 @@ export function transactionIdentity(transaction: Transaction) {
 }
 
 export function transactionFingerprint(transaction: Transaction) {
-  return [
-    transactionIdentity(transaction),
-    transaction.amount.toFixed(2),
-    normalizeText(transaction.method),
-    transaction.status,
-  ].join("|");
+  return [transactionIdentity(transaction), transaction.amount.toFixed(2)].join("|");
+}
+
+export function transactionContentFingerprint(transaction: Transaction) {
+  const additional = Object.entries(transaction.additionalData ?? {}).sort(([a], [b]) =>
+    a.localeCompare(b),
+  );
+  return `${transactionFingerprint(transaction)}|${JSON.stringify(additional)}`;
 }
 
 export function groupPossibleDuplicates(rows: Transaction[]): PossibleDuplicateGroup[] {
   const groups = new Map<string, Transaction[]>();
   rows.forEach((row) => {
-    const fingerprint = transactionFingerprint(row);
+    const fingerprint = transactionContentFingerprint(row);
     groups.set(fingerprint, [...(groups.get(fingerprint) ?? []), row]);
   });
   return [...groups.entries()]
@@ -59,13 +61,17 @@ export function reuseImportMapping(
     return preview.mapping;
   }
 
+  const profileColumns =
+    profile.columns ?? profile.headers.map((header, index) => ({ id: header, header, index }));
   return Object.fromEntries(
     importFields.map(({ key }) => {
-      const previousHeader = profile.mapping[key];
-      const header = preview.headers.find(
-        (candidate) => normalizeImportHeader(candidate) === normalizeImportHeader(previousHeader),
+      const previousColumn = profileColumns.find(({ id }) => id === profile.mapping[key]);
+      const previousHeader = previousColumn?.header ?? profile.mapping[key];
+      const column = preview.columns.find(
+        (candidate) =>
+          normalizeImportHeader(candidate.header) === normalizeImportHeader(previousHeader),
       );
-      return [key, header ?? preview.mapping[key]];
+      return [key, column?.id ?? preview.mapping[key]];
     }),
   ) as ColumnMapping;
 }
@@ -87,7 +93,7 @@ export function compareTransactionUpdates(
     groupPossibleDuplicates(imported).map((group) => group.fingerprint),
   );
   const possibleDuplicates = imported.filter((row) =>
-    duplicateFingerprints.has(transactionFingerprint(row)),
+    duplicateFingerprints.has(transactionContentFingerprint(row)),
   );
 
   const currentGroups = groupByIdentity(current);
@@ -106,7 +112,7 @@ export function compareTransactionUpdates(
     for (let index = newRows.length - 1; index >= 0; index -= 1) {
       const incoming = newRows[index]!;
       const oldIndex = oldRows.findIndex(
-        (row) => transactionFingerprint(row) === transactionFingerprint(incoming),
+        (row) => transactionContentFingerprint(row) === transactionContentFingerprint(incoming),
       );
       if (oldIndex >= 0) {
         const existing = oldRows.splice(oldIndex, 1)[0]!;
@@ -116,8 +122,12 @@ export function compareTransactionUpdates(
       }
     }
 
-    oldRows.sort((a, b) => transactionFingerprint(a).localeCompare(transactionFingerprint(b)));
-    newRows.sort((a, b) => transactionFingerprint(a).localeCompare(transactionFingerprint(b)));
+    oldRows.sort((a, b) =>
+      transactionContentFingerprint(a).localeCompare(transactionContentFingerprint(b)),
+    );
+    newRows.sort((a, b) =>
+      transactionContentFingerprint(a).localeCompare(transactionContentFingerprint(b)),
+    );
     while (oldRows.length && newRows.length) {
       const before = oldRows.shift()!;
       const incoming = newRows.shift()!;

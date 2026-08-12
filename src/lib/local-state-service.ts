@@ -8,6 +8,7 @@ export type LocalState = {
   activeProjectId: string | null;
   transactionsByProject: Record<string, Transaction[]>;
   importProfilesByProject: Record<string, ImportProfile>;
+  visibleColumnsByProject: Record<string, string[]>;
 };
 
 export function parseLocalState(raw: string): LocalState {
@@ -17,6 +18,7 @@ export function parseLocalState(raw: string): LocalState {
     activeProjectId: parsed.activeProjectId ?? null,
     transactionsByProject: parsed.transactionsByProject ?? {},
     importProfilesByProject: parsed.importProfilesByProject ?? {},
+    visibleColumnsByProject: parsed.visibleColumnsByProject ?? {},
   };
 }
 
@@ -33,13 +35,17 @@ export function deleteProjectFromLocalState(state: LocalState, projectId: string
   const { [projectId]: removedTransactions, ...transactionsByProject } =
     state.transactionsByProject;
   const { [projectId]: removedProfile, ...importProfilesByProject } = state.importProfilesByProject;
+  const { [projectId]: removedColumns, ...visibleColumnsByProject } =
+    state.visibleColumnsByProject ?? {};
   void removedTransactions;
   void removedProfile;
+  void removedColumns;
   return {
     projects,
     activeProjectId:
       state.activeProjectId === projectId ? (projects[0]?.id ?? null) : state.activeProjectId,
     transactionsByProject,
     importProfilesByProject,
+    visibleColumnsByProject,
   };
 }

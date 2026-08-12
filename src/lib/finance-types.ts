@@ -2,6 +2,14 @@ export type TransactionType = "receita" | "despesa";
 
 export type TransactionStatus = "Pago" | "Pendente" | "Atrasado";
 
+export type ImportedValue = string | number | boolean | null;
+
+export type ImportedColumn = {
+  id: string;
+  header: string;
+  index: number;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -22,10 +30,11 @@ export type Transaction = {
   date: string;
   description: string;
   category: string;
-  method: string;
+  method?: string;
   type: TransactionType;
   amount: number;
-  status: TransactionStatus;
+  status?: TransactionStatus;
+  additionalData?: Record<string, ImportedValue>;
 };
 
 export type ImportField = "date" | "description" | "category" | "type" | "amount";
@@ -37,6 +46,7 @@ export type RawImportRow = Record<string, unknown>;
 export type ImportPreview = {
   fileName: string;
   headers: string[];
+  columns: ImportedColumn[];
   rows: RawImportRow[];
   mapping: ColumnMapping;
   missingFields: ImportField[];
@@ -45,6 +55,7 @@ export type ImportPreview = {
 export type ImportProfile = {
   headers: string[];
   mapping: ColumnMapping;
+  columns?: ImportedColumn[];
 };
 
 export type TransactionChange = {

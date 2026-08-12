@@ -9,6 +9,7 @@ import type {
 import {
   getImportUploadFile,
   hasSupportedImportDrag,
+  formatImportPreviewValue,
   importFields,
   normalizeImportedRows,
   readImportFile,
@@ -30,7 +31,7 @@ import {
 type Stage = "file" | "mapping" | "summary";
 
 export function DataUpdateDialog() {
-  const { transactions, replaceTransactions, importProfile, setImportProfile } = useApp();
+  const { transactions, project, importProfile, commitImportedTransactions } = useApp();
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>("file");
@@ -81,11 +82,18 @@ export function DataUpdateDialog() {
   };
 
   const applyUpdate = () => {
-    if (!comparison || !preview || !mapping) return;
-    replaceTransactions(comparison.nextTransactions);
-    setImportProfile({ headers: preview.headers, mapping });
-    setOpen(false);
-    reset();
+    if (!comparison || !preview || !mapping || !project) return;
+    try {
+      commitImportedTransactions(
+        comparison.nextTransactions,
+        { headers: preview.headers, columns: preview.columns, mapping },
+        { targetProjectId: project.id },
+      );
+      setOpen(false);
+      reset();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Não foi possível salvar a atualização.");
+    }
   };
 
   const ready = mapping && importFields.every(({ key }) => mapping[key]);
@@ -170,8 +178,10 @@ export function DataUpdateDialog() {
                       className="w-full rounded-lg border border-border bg-card px-2.5 py-2 outline-none focus:border-primary/50"
                     >
                       <option value="">Selecione…</option>
-                      {preview.headers.map((header) => (
-                        <option key={header}>{header}</option>
+                      {preview.columns.map((column) => (
+                        <option key={column.id} value={column.id}>
+                          {column.header}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -181,9 +191,9 @@ export function DataUpdateDialog() {
                 <table className="w-full min-w-[560px] text-sm">
                   <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
                     <tr>
-                      {preview.headers.map((header) => (
-                        <th key={header} className="px-3 py-2">
-                          {header}
+                      {preview.columns.map((column) => (
+                        <th key={column.id} className="px-3 py-2">
+                          {column.header}
                         </th>
                       ))}
                     </tr>
@@ -191,9 +201,9 @@ export function DataUpdateDialog() {
                   <tbody>
                     {preview.rows.slice(0, 3).map((row, index) => (
                       <tr key={index} className="border-t border-border">
-                        {preview.headers.map((header) => (
-                          <td key={header} className="max-w-40 truncate px-3 py-2">
-                            {String(row[header] ?? "")}
+                        {preview.columns.map((column) => (
+                          <td key={column.id} className="max-w-40 truncate px-3 py-2">
+                            {formatImportPreviewValue(row[column.id])}
                           </td>
                         ))}
                       </tr>

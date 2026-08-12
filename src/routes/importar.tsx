@@ -19,6 +19,7 @@ import {
   importFields,
   getImportUploadFile,
   hasSupportedImportDrag,
+  formatImportPreviewValue,
   normalizeImportedRows,
   readImportFile,
 } from "@/lib/import-service";
@@ -47,7 +48,7 @@ const steps = [
 
 function ImportPage() {
   const navigate = useNavigate();
-  const { project, createProject, setOnboarded, replaceTransactions, setImportProfile } = useApp();
+  const { project, commitImportedTransactions } = useApp();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -76,12 +77,13 @@ function ImportPage() {
       setPreview(null);
       setMapping(null);
       setStep(2);
-      const targetProject = project ?? createProject({ name: newProjectName });
       setStep(3);
-      replaceTransactions(rows, targetProject.id);
-      setImportProfile({ headers: parsed.headers, mapping: selectedMapping }, targetProject.id);
+      commitImportedTransactions(
+        rows,
+        { headers: parsed.headers, columns: parsed.columns, mapping: selectedMapping },
+        project ? { targetProjectId: project.id } : { newProjectName },
+      );
       setStep(4);
-      setOnboarded(true);
       setStep(steps.length);
       await navigate({ to: "/dashboard" });
     } catch (cause) {
@@ -178,9 +180,9 @@ function ImportPage() {
                         className="w-full rounded-lg border border-border bg-card px-2.5 py-2 text-sm outline-none focus:border-primary/50"
                       >
                         <option value="">Selecione…</option>
-                        {preview.headers.map((header) => (
-                          <option key={header} value={header}>
-                            {header}
+                        {preview.columns.map((column) => (
+                          <option key={column.id} value={column.id}>
+                            {column.header}
                           </option>
                         ))}
                       </select>
@@ -193,9 +195,9 @@ function ImportPage() {
                 <table className="w-full min-w-[680px] text-sm">
                   <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      {preview.headers.map((header) => (
-                        <th key={header} className="px-3 py-2 font-medium">
-                          {header}
+                      {preview.columns.map((column) => (
+                        <th key={column.id} className="px-3 py-2 font-medium">
+                          {column.header}
                         </th>
                       ))}
                     </tr>
@@ -203,9 +205,9 @@ function ImportPage() {
                   <tbody>
                     {preview.rows.slice(0, 5).map((row, index) => (
                       <tr key={index} className="border-t border-border">
-                        {preview.headers.map((header) => (
-                          <td key={header} className="max-w-48 truncate px-3 py-2">
-                            {String(row[header] ?? "")}
+                        {preview.columns.map((column) => (
+                          <td key={column.id} className="max-w-48 truncate px-3 py-2">
+                            {formatImportPreviewValue(row[column.id])}
                           </td>
                         ))}
                       </tr>

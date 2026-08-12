@@ -3,11 +3,13 @@ import type {
   ColumnMapping,
   ImportField,
   ImportPreview,
+  ImportedColumn,
+  ImportedValue,
   RawImportRow,
   Transaction,
   TransactionType,
 } from "./finance-types";
-import { parseCalendarDate } from "./calendar-date";
+import { formatCalendarDate, parseCalendarDate } from "./calendar-date";
 
 export const importFields: { key: ImportField; label: string }[] = [
   { key: "date", label: "Data" },
@@ -44,6 +46,15 @@ export function getImportUploadFile(files?: ArrayLike<File> | null) {
   return files?.[0];
 }
 
+export function formatImportPreviewValue(value: unknown) {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) {
+    const date = parseCalendarDate(value);
+    return date ? formatCalendarDate(date) : "";
+  }
+  return String(value);
+}
+
 const supportedImportMimeTypes = new Set([
   "text/csv",
   "application/csv",
@@ -58,11 +69,13 @@ export function hasSupportedImportDrag(transfer: Pick<DataTransfer, "files" | "i
   );
 }
 
-function detectMapping(headers: string[]): ColumnMapping {
+function detectMapping(columns: ImportedColumn[]): ColumnMapping {
   return Object.fromEntries(
     importFields.map(({ key }) => {
-      const match = headers.find((header) => aliases[key].includes(normalizeImportHeader(header)));
-      return [key, match ?? ""];
+      const match = columns.find(({ header }) =>
+        aliases[key].includes(normalizeImportHeader(header)),
+      );
+      return [key, match?.id ?? ""];
     }),
   ) as ColumnMapping;
 }
@@ -77,21 +90,41 @@ export async function readImportFile(file: File): Promise<ImportPreview> {
   else matrix = await readSheet(file);
   const [headerRow, ...dataRows] = matrix;
   if (!headerRow?.length) throw new Error("A planilha não possui cabeçalhos.");
-  const headers = headerRow.map((value, index) => String(value ?? `Coluna ${index + 1}`).trim());
+  const headers = headerRow.map((value, index) => {
+    const header = String(value ?? "").trim();
+    return header || `Coluna ${index + 1}`;
+  });
+  const headerOccurrences = new Map<string, number>();
+  const columns = headers.map((header, index) => {
+    const normalized = normalizeImportHeader(header) || `coluna-${index + 1}`;
+    const occurrence = (headerOccurrences.get(normalized) ?? 0) + 1;
+    headerOccurrences.set(normalized, occurrence);
+    return { id: `column:${normalized}:${occurrence}`, header, index };
+  });
   const rows = dataRows
     .filter((row) => row.some((cell) => cell !== null && String(cell).trim() !== ""))
     .map((row) =>
-      Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])),
+      Object.fromEntries(columns.map((column) => [column.id, row[column.index] ?? null])),
     ) as RawImportRow[];
   if (rows.length === 0) throw new Error("O arquivo não possui dados para importar.");
-  const mapping = detectMapping(headers);
+  const mapping = detectMapping(columns);
   return {
     fileName: file.name,
     headers,
+    columns,
     rows,
     mapping,
     missingFields: importFields.map((field) => field.key).filter((field) => !mapping[field]),
   };
+}
+
+function preserveImportedValue(value: unknown): ImportedValue {
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) return parseCalendarDate(value);
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  return String(value);
 }
 
 function parseCsv(text: string): string[][] {
@@ -173,10 +206,13 @@ export function normalizeImportedRows(
       date,
       description,
       category: String(row[mapping.category] ?? "Sem categoria").trim() || "Sem categoria",
-      method: "Importado",
       type,
       amount,
-      status: "Pago",
+      additionalData: Object.fromEntries(
+        preview.columns
+          .filter((column) => !Object.values(mapping).includes(column.id))
+          .map((column) => [column.id, preserveImportedValue(row[column.id])]),
+      ),
     });
   });
 

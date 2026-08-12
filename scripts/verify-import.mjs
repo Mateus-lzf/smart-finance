@@ -15,13 +15,13 @@ globalThis.FileReader = class FileReader {
   }
 };
 
-function makeXlsx() {
+function makeXlsx(inputValues, dateColumns = new Set([0])) {
   const contentTypes = `<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
   const rootRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
   const workbook = `<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Dados" sheetId="1" r:id="rId1"/></sheets></workbook>`;
   const workbookRels = `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
   const styles = `<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="1"><font/></fonts><fills count="1"><fill/></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf xfId="0"/><xf xfId="0" numFmtId="14" applyNumberFormat="1"/></cellXfs></styleSheet>`;
-  const values = [
+  const values = inputValues ?? [
     ["date", "description", "category", "type", "amount"],
     [46235, "Serviço", "Vendas", "entrada", 3000],
     [46236, "Conta", "Fixos", "saída", 500],
@@ -32,9 +32,11 @@ function makeXlsx() {
         `<row r="${rowIndex + 1}">${row
           .map((value, columnIndex) => {
             const reference = `${String.fromCharCode(65 + columnIndex)}${rowIndex + 1}`;
-            return typeof value === "number"
-              ? `<c r="${reference}"${columnIndex === 0 ? ' s="1"' : ""}><v>${value}</v></c>`
-              : `<c r="${reference}" t="inlineStr"><is><t>${value}</t></is></c>`;
+            return typeof value === "boolean"
+              ? `<c r="${reference}" t="b"><v>${value ? 1 : 0}</v></c>`
+              : typeof value === "number"
+                ? `<c r="${reference}"${dateColumns.has(columnIndex) ? ' s="1"' : ""}><v>${value}</v></c>`
+                : `<c r="${reference}" t="inlineStr"><is><t>${value}</t></is></c>`;
           })
           .join("")}</row>`,
     )
@@ -138,6 +140,11 @@ try {
 
   const xlsxPreview = await importer.readImportFile(new File([makeXlsx()], "dados.xlsx"));
   assert.deepEqual(xlsxPreview.missingFields, []);
+  assert.equal(
+    importer.formatImportPreviewValue(xlsxPreview.rows[0][xlsxPreview.mapping.date]),
+    "01/08/2026",
+    "a prévia XLSX deve representar datas de calendário sem conversão de timezone",
+  );
   const xlsxRows = importer.normalizeImportedRows(xlsxPreview);
   assert.equal(xlsxRows[0].date, "2026-08-01");
   assert.equal(calendarDate.formatCalendarDate(xlsxRows[0].date), "01/08/2026");
@@ -151,6 +158,63 @@ try {
     3000,
   );
   console.log("Importação XLSX e regressão de datas 01/08/2026: OK");
+
+  const wideCsv = [
+    "Data;Descrição;Categoria;Tipo;Valor;Forma de pagamento;Cliente;Filial;Centro de custo;Observação extra;Vazio",
+    "01/08/2026;Venda;Vendas;Receita;500,00;PIX;Cliente A;Fortaleza;Comercial;Pedido 1;",
+  ].join("\n");
+  const widePreview = await importer.readImportFile(new File([wideCsv], "colunas-extras.csv"));
+  const wideRows = importer.normalizeImportedRows(widePreview);
+  const extraByHeader = Object.fromEntries(
+    widePreview.columns.map((column) => [column.header, column.id]),
+  );
+  assert.equal(wideRows[0].additionalData[extraByHeader["Forma de pagamento"]], "PIX");
+  assert.equal(wideRows[0].additionalData[extraByHeader.Cliente], "Cliente A");
+  assert.equal(wideRows[0].additionalData[extraByHeader.Filial], "Fortaleza");
+  assert.equal(wideRows[0].additionalData[extraByHeader["Centro de custo"]], "Comercial");
+  assert.equal(wideRows[0].additionalData[extraByHeader.Vazio], null);
+  assert.equal("method" in wideRows[0], false, "pagamento artificial não deve ser criado");
+  assert.equal("status" in wideRows[0], false, "status artificial não deve ser criado");
+
+  const typedXlsx = makeXlsx(
+    [
+      ["Data", "Descrição", "Categoria", "Tipo", "Valor", "Quantidade", "Ativo", "Data entrega"],
+      [46235, "Serviço", "Vendas", "Receita", 3000, 12, true, 46236],
+    ],
+    new Set([0, 7]),
+  );
+  const typedPreview = await importer.readImportFile(new File([typedXlsx], "tipos-extras.xlsx"));
+  const typedRows = importer.normalizeImportedRows(typedPreview);
+  const typedByHeader = Object.fromEntries(
+    typedPreview.columns.map((column) => [column.header, column.id]),
+  );
+  assert.equal(typedRows[0].additionalData[typedByHeader.Quantidade], 12);
+  assert.equal(typedRows[0].additionalData[typedByHeader.Ativo], true);
+  assert.equal(typedRows[0].additionalData[typedByHeader["Data entrega"]], "2026-08-02");
+  assert.equal(
+    importer.formatImportPreviewValue(typedPreview.rows[0][typedByHeader["Data entrega"]]),
+    "02/08/2026",
+    "datas adicionais devem usar a mesma representação date-only na prévia",
+  );
+  assert.equal(
+    importer.formatImportPreviewValue(new Date("2026-08-01T00:00:00.000Z")),
+    "01/08/2026",
+  );
+
+  const repeatedHeaderPreview = await importer.readImportFile(
+    new File(
+      ["Data,Descrição,Categoria,Tipo,Valor,Tag,Tag\n01/08/2026,Venda,Vendas,Receita,10,A,B"],
+      "cabecalhos-repetidos.csv",
+    ),
+  );
+  const repeatedHeaderRows = importer.normalizeImportedRows(repeatedHeaderPreview);
+  const tagColumns = repeatedHeaderPreview.columns.filter((column) => column.header === "Tag");
+  assert.equal(tagColumns.length, 2);
+  assert.deepEqual(
+    tagColumns.map((column) => repeatedHeaderRows[0].additionalData[column.id]),
+    ["A", "B"],
+  );
+  console.log("Colunas adicionais CSV/XLSX, tipos, vazios e cabeçalhos repetidos: OK");
 
   const edited = xlsxRows.map((row) => (row.type === "despesa" ? { ...row, amount: 1000 } : row));
   assert.equal(finance.kpisFromTransactions(edited).saldo.value, 2000);
@@ -206,6 +270,26 @@ try {
   assert.equal(finance.kpisFromTransactions(comparison.nextTransactions).saldo.value, 2500);
   console.log("Atualização, inclusão, alteração, remoção e duplicatas: OK");
 
+  const extraChangeBefore = [{ ...wideRows[0], id: "extra-old" }];
+  const changedExtraCsv = [
+    "Data;Descrição;Categoria;Tipo;Valor;Forma de pagamento;Cliente;Filial;Centro de custo;Nova coluna",
+    "01/08/2026;Venda;Vendas;Receita;500,00;PIX;Cliente A;Recife;Comercial;Novo valor",
+  ].join("\n");
+  const changedExtraPreview = await importer.readImportFile(
+    new File([changedExtraCsv], "extras-atualizados.csv"),
+  );
+  const changedExtraRows = importer.normalizeImportedRows(changedExtraPreview);
+  const extraComparison = updateService.compareTransactionUpdates(
+    extraChangeBefore,
+    changedExtraRows,
+  );
+  assert.equal(extraComparison.changed.length, 1, "mudança apenas adicional deve ser detectada");
+  assert.equal(extraComparison.added.length, 0);
+  assert.equal(extraComparison.removed.length, 0);
+  assert.equal(extraComparison.changed[0].after.id, "extra-old");
+  assert.equal(extraComparison.nextTransactions.length, 1);
+  console.log("Atualização de campos adicionais e conjuntos diferentes de colunas: OK");
+
   const repeatedBase = {
     id: "uber-1",
     date: "2026-08-10",
@@ -222,6 +306,26 @@ try {
   assert.deepEqual(
     updateService.groupPossibleDuplicates(legitimateRepeatedRows).map((group) => group.occurrences),
     [2],
+  );
+
+  const repeatedWithExtras = [
+    { ...repeatedBase, id: "branch-1", additionalData: { branch: "A" } },
+    { ...repeatedBase, id: "branch-2", additionalData: { branch: "B" } },
+  ];
+  assert.equal(
+    updateService.groupPossibleDuplicates(repeatedWithExtras).length,
+    0,
+    "ocorrências financeiramente iguais com dados adicionais diferentes não são duplicatas exatas",
+  );
+  const exactExtraDuplicates = [
+    repeatedWithExtras[0],
+    { ...repeatedWithExtras[0], id: "branch-3" },
+  ];
+  assert.equal(updateService.groupPossibleDuplicates(exactExtraDuplicates)[0].occurrences, 2);
+  assert.equal(
+    updateService.compareTransactionUpdates([], exactExtraDuplicates).nextTransactions.length,
+    2,
+    "duplicatas com dados adicionais devem permanecer duas ocorrências",
   );
   assert.equal(repeatedComparison.added.length, 2);
   assert.equal(repeatedComparison.nextTransactions.length, 2);
@@ -251,12 +355,36 @@ try {
     activeProjectId: createdProject.id,
     transactionsByProject: { [createdProject.id]: comparison.nextTransactions },
     importProfilesByProject: {
-      [createdProject.id]: { headers: nextPreview.headers, mapping: reusedMapping },
+      [createdProject.id]: {
+        headers: changedExtraPreview.headers,
+        columns: changedExtraPreview.columns,
+        mapping: changedExtraPreview.mapping,
+      },
+    },
+    visibleColumnsByProject: {
+      [createdProject.id]: ["date", "description", extraByHeader.Filial],
     },
   });
   const reloaded = localState.parseLocalState(persisted);
   assert.deepEqual(reloaded.transactionsByProject[createdProject.id], comparison.nextTransactions);
-  assert.deepEqual(reloaded.importProfilesByProject[createdProject.id].mapping, reusedMapping);
+  assert.deepEqual(
+    reloaded.importProfilesByProject[createdProject.id].columns,
+    changedExtraPreview.columns,
+  );
+  assert.deepEqual(reloaded.visibleColumnsByProject[createdProject.id], [
+    "date",
+    "description",
+    extraByHeader.Filial,
+  ]);
+  const legacyReloaded = localState.parseLocalState(
+    JSON.stringify({
+      projects: [createdProject],
+      activeProjectId: createdProject.id,
+      transactionsByProject: { [createdProject.id]: initial },
+      importProfilesByProject: {},
+    }),
+  );
+  assert.deepEqual(legacyReloaded.visibleColumnsByProject, {});
 
   const memory = new Map();
   const storage = {
@@ -277,6 +405,10 @@ try {
     importProfilesByProject: {
       [createdProject.id]: { headers: nextPreview.headers, mapping: reusedMapping },
     },
+    visibleColumnsByProject: {
+      [createdProject.id]: ["date", "description"],
+      [secondProject.id]: ["date", "amount"],
+    },
   };
   localState.persistLocalState(storage, stateBeforeDeletion);
   const stateAfterDeletion = localState.deleteProjectFromLocalState(
@@ -294,6 +426,22 @@ try {
   assert.equal(reloadedImmediately.activeProjectId, secondProject.id);
   assert.equal(createdProject.id in reloadedImmediately.transactionsByProject, false);
   assert.equal(createdProject.id in reloadedImmediately.importProfilesByProject, false);
+  assert.equal(createdProject.id in reloadedImmediately.visibleColumnsByProject, false);
+
+  const intactStorage = new Map([[localState.LOCAL_STATE_KEY, "estado-anterior"]]);
+  const fullStorage = {
+    setItem() {
+      const error = new Error("Quota exceeded");
+      error.name = "QuotaExceededError";
+      throw error;
+    },
+  };
+  assert.throws(() => localState.persistLocalState(fullStorage, stateBeforeDeletion));
+  assert.equal(
+    intactStorage.get(localState.LOCAL_STATE_KEY),
+    "estado-anterior",
+    "falha de persistência deve manter o estado anterior intacto",
+  );
   console.log("Exclusão persistente permanece após recarga imediata: OK");
 
   const intactBeforeInvalid = structuredClone(initial);
