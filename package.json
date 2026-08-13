@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "test:import": "node scripts/verify-import.mjs",
-    "test": "node scripts/verify-import.mjs",
+    "test": "node scripts/verify-import.mjs && node scripts/verify-insights.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write ."

@@ -35,6 +35,8 @@ type AppState = {
   importProfile: ImportProfile | null;
   visibleColumns: string[];
   setVisibleColumns: (columns: string[]) => void;
+  analyticDimensions: string[];
+  setAnalyticDimensions: (columns: string[]) => void;
   commitImportedTransactions: (
     rows: Transaction[],
     profile: ImportProfile,
@@ -66,6 +68,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [visibleColumnsByProject, setVisibleColumnsByProject] = useState<Record<string, string[]>>(
     {},
   );
+  const [analyticDimensionsByProject, setAnalyticDimensionsByProject] = useState<
+    Record<string, string[]>
+  >({});
   const [onboarded, setOnboarded] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -88,6 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setTransactionsByProject(state.transactionsByProject);
         setImportProfilesByProject(state.importProfilesByProject);
         setVisibleColumnsByProject(state.visibleColumnsByProject);
+        setAnalyticDimensionsByProject(state.analyticDimensionsByProject);
         const activeId = storedProjects.some((project) => project.id === state.activeProjectId)
           ? (state.activeProjectId ?? null)
           : (storedProjects[0]?.id ?? null);
@@ -108,6 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       transactionsByProject,
       importProfilesByProject,
       visibleColumnsByProject,
+      analyticDimensionsByProject,
     };
     try {
       persistLocalState(localStorage, state);
@@ -120,6 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     transactionsByProject,
     importProfilesByProject,
     visibleColumnsByProject,
+    analyticDimensionsByProject,
     hydrated,
   ]);
 
@@ -138,6 +146,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...current,
       [project.id]: DEFAULT_VISIBLE_COLUMNS,
     }));
+    setAnalyticDimensionsByProject((current) => ({ ...current, [project.id]: [] }));
     setProjectIdState(project.id);
     setOnboarded(true);
     return project;
@@ -158,6 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           transactionsByProject,
           importProfilesByProject,
           visibleColumnsByProject,
+          analyticDimensionsByProject,
         },
         id,
       );
@@ -171,15 +181,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTransactionsByProject(next.transactionsByProject);
       setImportProfilesByProject(next.importProfilesByProject);
       setVisibleColumnsByProject(next.visibleColumnsByProject);
+      setAnalyticDimensionsByProject(next.analyticDimensionsByProject);
       setOnboarded(next.projects.length > 0);
     },
-    [projects, projectId, transactionsByProject, importProfilesByProject, visibleColumnsByProject],
+    [
+      projects,
+      projectId,
+      transactionsByProject,
+      importProfilesByProject,
+      visibleColumnsByProject,
+      analyticDimensionsByProject,
+    ],
   );
 
   const setVisibleColumns = useCallback(
     (columns: string[]) => {
       if (!projectId) return;
       setVisibleColumnsByProject((current) => ({ ...current, [projectId]: columns }));
+    },
+    [projectId],
+  );
+
+  const setAnalyticDimensions = useCallback(
+    (columns: string[]) => {
+      if (!projectId) return;
+      setAnalyticDimensionsByProject((current) => ({ ...current, [projectId]: columns }));
     },
     [projectId],
   );
@@ -208,6 +234,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...visibleColumnsByProject,
           [id]: visibleColumnsByProject[id] ?? DEFAULT_VISIBLE_COLUMNS,
         },
+        analyticDimensionsByProject: {
+          ...analyticDimensionsByProject,
+          [id]: (analyticDimensionsByProject[id] ?? []).filter((columnId) =>
+            profile.columns?.some((column) => column.id === columnId),
+          ),
+        },
       };
       try {
         persistLocalState(localStorage, next);
@@ -223,10 +255,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTransactionsByProject(next.transactionsByProject);
       setImportProfilesByProject(next.importProfilesByProject);
       setVisibleColumnsByProject(next.visibleColumnsByProject);
+      setAnalyticDimensionsByProject(next.analyticDimensionsByProject);
       setOnboarded(true);
       return next.projects.find((item) => item.id === id)!;
     },
-    [projectId, projects, transactionsByProject, importProfilesByProject, visibleColumnsByProject],
+    [
+      projectId,
+      projects,
+      transactionsByProject,
+      importProfilesByProject,
+      visibleColumnsByProject,
+      analyticDimensionsByProject,
+    ],
   );
 
   const updateTransaction = useCallback(
@@ -287,6 +327,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => (projectId ? (visibleColumnsByProject[projectId] ?? DEFAULT_VISIBLE_COLUMNS) : []),
     [projectId, visibleColumnsByProject],
   );
+  const analyticDimensions = useMemo(
+    () => (projectId ? (analyticDimensionsByProject[projectId] ?? []) : []),
+    [projectId, analyticDimensionsByProject],
+  );
   const transactions = useMemo(
     () => (projectId ? (transactionsByProject[projectId] ?? []) : []),
     [projectId, transactionsByProject],
@@ -305,6 +349,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importProfile,
       visibleColumns,
       setVisibleColumns,
+      analyticDimensions,
+      setAnalyticDimensions,
       commitImportedTransactions,
       onboarded,
       setOnboarded,
@@ -328,6 +374,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importProfile,
       visibleColumns,
       setVisibleColumns,
+      analyticDimensions,
+      setAnalyticDimensions,
       commitImportedTransactions,
       onboarded,
       aiOpen,
