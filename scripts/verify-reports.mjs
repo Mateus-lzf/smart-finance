@@ -4,6 +4,7 @@ import { createServer } from "vite";
 const vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
 try {
   const service = await vite.ssrLoadModule("/src/lib/report-service.ts");
+  const exportService = await vite.ssrLoadModule("/src/lib/report-export-service.ts");
   let id = 0;
   const row = (date, type, amount, category = "Geral", extras) => ({
     id: `report-${id++}`,
@@ -140,6 +141,71 @@ try {
   assert.equal(dateOnly.transactions[0].date, "2026-08-01");
   assert.equal(service.getLatestMonthRange(rows).startDate, "2027-01-01");
   assert.equal(service.getLastTwelveMonthsRange(rows).startDate, "2026-02-01");
+
+  const csvRows = [
+    {
+      ...row("2026-08-01", "despesa", 1234.56, "Marketing", {
+        branch: "Fortaleza",
+        extra: 12.5,
+      }),
+      description: '=SOMA(A1:A2); "teste"\nsegunda linha',
+    },
+    { ...row("2026-08-02", "receita", 50, "Vendas", { branch: "+CMD" }), description: "-CMD" },
+    {
+      ...row("2026-08-03", "receita", 75, "Vendas", { branch: "@algo" }),
+      description: "-texto comum",
+    },
+  ];
+  const csvReport = build(csvRows, {
+    startDate: "2026-08-01",
+    endDate: "2026-08-31",
+    type: "all",
+    categories: [],
+    dimensionColumnId: "branch",
+    dimensionValueKeys: [],
+  });
+  const csvColumns = exportService
+    .getReportExportColumns(columns)
+    .filter((column) => ["date", "description", "amount", "branch", "extra"].includes(column.id));
+  const csv = exportService.serializeReportCsv(csvReport, csvColumns);
+  assert.ok(csv.startsWith("\uFEFFData;Descrição;Valor;Filial;Extra\r\n"));
+  assert.match(csv, /01\/08\/2026;/);
+  assert.match(csv, /;-1234,56;Fortaleza;12,50/);
+  assert.doesNotMatch(csv, /'-1234,56/);
+  assert.match(csv, /'=SOMA\(A1:A2\)/);
+  assert.match(csv, /'\+CMD/);
+  assert.match(csv, /'-CMD/);
+  assert.match(csv, /'@algo/);
+  assert.match(csv, /'-texto comum/);
+  assert.match(csv, /""teste""\r?\nsegunda linha/);
+  assert.equal(csvReport.transactions.length, 3);
+  assert.equal((csv.match(/\r\n/g) ?? []).length >= 3, true);
+
+  const selectedCsv = exportService.serializeReportCsv(csvReport, [
+    { id: "date", label: "Data" },
+    { id: "branch", label: "Filial" },
+  ]);
+  assert.ok(selectedCsv.startsWith("\uFEFFData;Filial\r\n"));
+  assert.doesNotMatch(selectedCsv, /Descrição|Valor|Extra/);
+
+  const expenseCsv = exportService.serializeReportCsv(
+    build(csvRows, {
+      startDate: "2026-08-01",
+      endDate: "2026-08-31",
+      type: "despesa",
+      categories: ["Marketing"],
+      dimensionColumnId: "branch",
+      dimensionValueKeys: [service.reportDimensionValueKey("Fortaleza")],
+    }),
+    [{ id: "amount", label: "Valor" }],
+  );
+  assert.equal(expenseCsv, "\uFEFFValor\r\n-1234,56");
+  const emptyCsv = exportService.serializeReportCsv(noResults, [{ id: "date", label: "Data" }]);
+  assert.equal(emptyCsv, "\uFEFFData");
+  assert.equal(
+    exportService.reportCsvFileName("Projeto São João / 2026", csvReport),
+    "smart-finance-projeto-sao-joao-2026-2026-08-01-a-2026-08-31.csv",
+  );
 
   console.log("Relatórios, filtros, agrupamentos, dimensões e datas: OK");
 } finally {
