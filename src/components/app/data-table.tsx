@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
-import { Search, Plus, Upload, Filter, Columns3, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Plus, Upload, Filter, Columns3, Trash2, Pencil } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { useApp } from "@/lib/app-store";
 import { brl } from "@/lib/mock-data";
 import type { Transaction } from "@/lib/finance-types";
-import { parseCurrencyInput } from "@/lib/finance-service";
-import { formatCalendarDate, todayCalendarDate } from "@/lib/calendar-date";
+import { formatCalendarDate } from "@/lib/calendar-date";
+import { parseTransactionAmount } from "@/lib/transaction-service";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DataUpdateDialog } from "./data-update-dialog";
+import { TransactionDialog } from "./transaction-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -21,15 +23,20 @@ type Filters = { receita: boolean; despesa: boolean };
 
 function EditableCell({
   value,
+  editValue,
   onChange,
   align = "left",
 }: {
   value: string;
-  onChange: (v: string) => void;
+  editValue?: string;
+  onChange: (v: string) => boolean;
   align?: "left" | "right";
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(editValue ?? value);
+  useEffect(() => {
+    if (!editing) setDraft(editValue ?? value);
+  }, [editValue, editing, value]);
   if (editing)
     return (
       <input
@@ -38,7 +45,7 @@ function EditableCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           setEditing(false);
-          onChange(draft);
+          if (!onChange(draft)) setDraft(editValue ?? value);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -55,7 +62,10 @@ function EditableCell({
     );
   return (
     <button
-      onClick={() => setEditing(true)}
+      onClick={() => {
+        setDraft(editValue ?? value);
+        setEditing(true);
+      }}
       className={cn(
         "-mx-1.5 w-[calc(100%+0.75rem)] rounded-md px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-muted",
         align === "right" && "text-right",
@@ -78,6 +88,8 @@ export function DataTable() {
   } = useApp();
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>({ receita: true, despesa: true });
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -92,20 +104,32 @@ export function DataTable() {
     [rows, query, filters],
   );
 
-  const patch = (id: string, key: keyof Transaction, value: string) =>
-    updateTransaction(id, {
-      [key]: key === "amount" ? parseCurrencyInput(value) : value,
-    });
+  const patch = (id: string, key: "description" | "category" | "amount", value: string) => {
+    const normalized = key === "amount" ? parseTransactionAmount(value) : value.trim();
+    if (normalized === null || normalized === "") {
+      toast.error(
+        key === "amount" ? "Informe um valor maior que zero." : "O campo não pode ficar vazio.",
+      );
+      return false;
+    }
+    try {
+      updateTransaction(id, { [key]: normalized });
+      return true;
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não foi possível salvar a alteração.");
+      return false;
+    }
+  };
 
-  const addRow = () =>
-    addTransaction({
-      id: `TX-${Math.floor(Math.random() * 9000) + 1000}`,
-      date: todayCalendarDate(),
-      description: "Novo lançamento",
-      category: "Sem categoria",
-      type: "despesa",
-      amount: 0,
-    });
+  const openCreate = () => {
+    setEditingTransaction(null);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction);
+    setDialogOpen(true);
+  };
 
   const coreColumns = [
     { id: "date", label: "Data" },
@@ -183,13 +207,13 @@ export function DataTable() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={addRow}>
-          <Plus className="size-3.5" /> Nova linha
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={openCreate}>
+          <Plus className="size-3.5" /> Novo lançamento
         </Button>
         <DataUpdateDialog />
         <Button size="sm" className="gap-1.5" asChild>
           <Link to="/importar">
-            <Upload className="size-3.5" /> Importar planilha
+            <Upload className="size-3.5" /> Importar como novo projeto
           </Link>
         </Button>
       </div>
@@ -267,6 +291,7 @@ export function DataTable() {
                           <EditableCell
                             align="right"
                             value={`${r.type === "receita" ? "+" : "−"} ${brl(r.amount)}`}
+                            editValue={String(r.amount).replace(".", ",")}
                             onChange={(value) => patch(r.id, "amount", value)}
                           />
                         </td>
@@ -285,18 +310,40 @@ export function DataTable() {
                     );
                   })}
                   <td className="px-2 py-2 text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-muted-foreground hover:text-destructive"
-                      title="Excluir lançamento"
-                      onClick={() => {
-                        if (window.confirm(`Excluir o lançamento “${r.description}”?`))
-                          deleteTransaction(r.id);
-                      }}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
+                    <div className="flex justify-end gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-muted-foreground"
+                        title="Editar lançamento"
+                        aria-label={`Editar ${r.description}`}
+                        onClick={() => openEdit(r)}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-muted-foreground hover:text-destructive"
+                        title="Excluir lançamento"
+                        aria-label={`Excluir ${r.description}`}
+                        onClick={() => {
+                          if (!window.confirm(`Excluir o lançamento “${r.description}”?`)) return;
+                          try {
+                            deleteTransaction(r.id);
+                            toast.success("Lançamento excluído.");
+                          } catch (cause) {
+                            toast.error(
+                              cause instanceof Error
+                                ? cause.message
+                                : "Não foi possível excluir o lançamento.",
+                            );
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -315,9 +362,24 @@ export function DataTable() {
         </div>
         <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
           <span>{filtered.length} lançamentos</span>
-          <span>Clique em qualquer célula para editar</span>
+          <span>
+            Edite Descrição, Categoria ou Valor rapidamente; use Editar para todos os campos.
+          </span>
         </div>
       </div>
+      <TransactionDialog
+        open={dialogOpen}
+        transaction={editingTransaction}
+        onOpenChange={setDialogOpen}
+        onCreate={(transaction) => {
+          addTransaction(transaction);
+          toast.success("Lançamento criado.");
+        }}
+        onUpdate={(id, patchValue) => {
+          updateTransaction(id, patchValue);
+          toast.success("Lançamento alterado.");
+        }}
+      />
     </div>
   );
 }

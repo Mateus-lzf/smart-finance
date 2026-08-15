@@ -208,6 +208,7 @@ export function normalizeImportedRows(
       category: String(row[mapping.category] ?? "Sem categoria").trim() || "Sem categoria",
       type,
       amount,
+      origin: "imported",
       additionalData: Object.fromEntries(
         preview.columns
           .filter((column) => !Object.values(mapping).includes(column.id))

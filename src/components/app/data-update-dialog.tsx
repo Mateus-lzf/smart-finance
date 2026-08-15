@@ -87,7 +87,7 @@ export function DataUpdateDialog() {
       commitImportedTransactions(
         comparison.nextTransactions,
         { headers: preview.headers, columns: preview.columns, mapping },
-        { targetProjectId: project.id },
+        { mode: "replace-project", targetProjectId: project.id },
       );
       setOpen(false);
       reset();
@@ -110,7 +110,12 @@ export function DataUpdateDialog() {
           if (!value) reset();
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent
+          className={cn(
+            "max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] min-w-0 overflow-x-hidden overflow-y-auto sm:max-w-2xl",
+            comparison?.possibleDuplicates.length && "md:max-w-4xl",
+          )}
+        >
           <DialogHeader>
             <DialogTitle>Atualizar dados do projeto</DialogTitle>
             <DialogDescription>
@@ -162,7 +167,7 @@ export function DataUpdateDialog() {
           )}
 
           {stage === "mapping" && preview && mapping && (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-4">
               <p className="text-sm text-muted-foreground">
                 Confirme as colunas que não puderam ser identificadas automaticamente.
               </p>
@@ -242,7 +247,7 @@ export function DataUpdateDialog() {
           )}
 
           {stage === "summary" && comparison && (
-            <div className="space-y-5">
+            <div className="min-w-0 space-y-5">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
                   ["Novos", comparison.added.length],
@@ -265,6 +270,32 @@ export function DataUpdateDialog() {
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                   Linhas exatamente repetidas foram identificadas como possíveis duplicatas. Todas
                   serão preservadas na atualização.
+                </p>
+              )}
+              {comparison.manualEditsOverwritten.length > 0 && (
+                <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm">
+                  <p className="flex gap-2 font-medium text-foreground">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                    {comparison.manualEditsOverwritten.length} edição
+                    {comparison.manualEditsOverwritten.length === 1
+                      ? " manual será"
+                      : "ões manuais serão"}
+                    substituída{comparison.manualEditsOverwritten.length === 1 ? "" : "s"} pelo
+                    arquivo.
+                  </p>
+                  <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                    Isso afeta somente lançamentos originalmente importados. Revise antes de
+                    confirmar.
+                  </p>
+                </div>
+              )}
+              {comparison.preservedManual.length > 0 && (
+                <p className="rounded-xl bg-accent/50 p-3 text-sm text-muted-foreground">
+                  {comparison.preservedManual.length} lançamento
+                  {comparison.preservedManual.length === 1
+                    ? " criado manualmente será preservado"
+                    : "s criados manualmente serão preservados"}
+                  .
                 </p>
               )}
               <PossibleDuplicates groups={groupPossibleDuplicates(comparison.possibleDuplicates)} />

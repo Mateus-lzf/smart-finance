@@ -89,14 +89,10 @@ export function compareTransactionUpdates(
   current: Transaction[],
   imported: Transaction[],
 ): TransactionUpdateComparison {
-  const duplicateFingerprints = new Set(
-    groupPossibleDuplicates(imported).map((group) => group.fingerprint),
-  );
-  const possibleDuplicates = imported.filter((row) =>
-    duplicateFingerprints.has(transactionContentFingerprint(row)),
-  );
+  const preservedManual = current.filter((row) => row.origin === "manual");
+  const currentImported = current.filter((row) => row.origin !== "manual");
 
-  const currentGroups = groupByIdentity(current);
+  const currentGroups = groupByIdentity(currentImported);
   const importedGroups = groupByIdentity(imported);
   const added: Transaction[] = [];
   const changed: TransactionUpdateComparison["changed"] = [];
@@ -118,7 +114,11 @@ export function compareTransactionUpdates(
         const existing = oldRows.splice(oldIndex, 1)[0]!;
         newRows.splice(index, 1);
         unchanged.push(existing);
-        resolvedByImportedId.set(incoming.id, existing);
+        resolvedByImportedId.set(incoming.id, {
+          ...incoming,
+          id: existing.id,
+          origin: "imported",
+        });
       }
     }
 
@@ -131,7 +131,7 @@ export function compareTransactionUpdates(
     while (oldRows.length && newRows.length) {
       const before = oldRows.shift()!;
       const incoming = newRows.shift()!;
-      const after = { ...incoming, id: before.id };
+      const after = { ...incoming, id: before.id, origin: "imported" as const };
       changed.push({ before, after });
       resolvedByImportedId.set(incoming.id, after);
     }
@@ -142,12 +142,26 @@ export function compareTransactionUpdates(
     removed.push(...oldRows);
   });
 
+  const importedNext = imported.map((row) => resolvedByImportedId.get(row.id) ?? row);
+  const nextTransactions = [...importedNext, ...preservedManual];
+  const duplicateFingerprints = new Set(
+    groupPossibleDuplicates(nextTransactions).map((group) => group.fingerprint),
+  );
+  const possibleDuplicates = nextTransactions.filter((row) =>
+    duplicateFingerprints.has(transactionContentFingerprint(row)),
+  );
+  const manualEditsOverwritten = [...changed.map((change) => change.before), ...removed].filter(
+    (row) => row.manuallyModified,
+  );
+
   return {
     added,
     changed,
     unchanged,
     removed,
     possibleDuplicates,
-    nextTransactions: imported.map((row) => resolvedByImportedId.get(row.id) ?? row),
+    manualEditsOverwritten,
+    preservedManual,
+    nextTransactions,
   };
 }

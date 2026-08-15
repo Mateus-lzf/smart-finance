@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { File } from "node:buffer";
+import { readFile } from "node:fs/promises";
 import { zipSync, strToU8 } from "fflate";
 import { createServer } from "vite";
 
@@ -228,6 +229,56 @@ try {
   assert.equal(deleted.length, 0);
   console.log("CRUD de lançamentos e recálculo financeiro: OK");
 
+  const validRevenue = transactionService.createManualTransaction({
+    date: "2026-08-14",
+    description: "Venda manual",
+    category: "Vendas",
+    type: "receita",
+    amount: "1.234,56",
+  });
+  const validExpense = transactionService.createManualTransaction({
+    date: "2026-08-15",
+    description: "Compra manual",
+    category: "Operação",
+    type: "despesa",
+    amount: "250,00",
+  });
+  assert.equal(validRevenue.ok, true);
+  assert.equal(validRevenue.value.amount, 1234.56);
+  assert.equal(validRevenue.value.type, "receita");
+  assert.equal(validRevenue.value.origin, "manual");
+  assert.equal(validExpense.value.type, "despesa");
+  assert.notEqual(validRevenue.value.id, validExpense.value.id);
+  assert.equal(
+    transactionService.createManualTransaction({
+      date: "2026-02-31",
+      description: "",
+      category: "",
+      type: "despesa",
+      amount: "0",
+    }).ok,
+    false,
+  );
+  assert.equal(transactionService.parseTransactionAmount("texto"), null);
+  const importedWithExtra = {
+    ...xlsxRows[0],
+    id: "imported-edit",
+    additionalData: { branch: "Fortaleza" },
+  };
+  const fullyEdited = transactionService.updateLocalTransaction(
+    [importedWithExtra],
+    importedWithExtra.id,
+    { date: "2026-08-20", description: "Editada", category: "Nova", type: "despesa", amount: 99 },
+  )[0];
+  assert.equal(fullyEdited.date, "2026-08-20");
+  assert.equal(fullyEdited.description, "Editada");
+  assert.equal(fullyEdited.category, "Nova");
+  assert.equal(fullyEdited.type, "despesa");
+  assert.equal(fullyEdited.amount, 99);
+  assert.deepEqual(fullyEdited.additionalData, { branch: "Fortaleza" });
+  assert.equal(fullyEdited.manuallyModified, true);
+  console.log("Criação, validação, IDs e edição completa de lançamentos: OK");
+
   const initial = [
     { ...csvRows[0], id: "old-1" },
     { ...csvRows[1], id: "old-2" },
@@ -350,6 +401,53 @@ try {
   );
   console.log("Duplicatas legítimas preservadas e comparação por ocorrência: OK");
 
+  const importedOriginal = { ...csvRows[0], id: "source-1", origin: "imported" };
+  const importedEdited = transactionService.updateLocalTransaction(
+    [importedOriginal],
+    importedOriginal.id,
+    { amount: 999 },
+  )[0];
+  const manualRow = { ...validExpense.value, id: "manual-expense" };
+  const refreshedImported = { ...importedOriginal, id: "fresh-1" };
+  const mixedComparison = updateService.compareTransactionUpdates(
+    [importedEdited, manualRow],
+    [refreshedImported],
+  );
+  assert.equal(mixedComparison.manualEditsOverwritten.length, 1);
+  assert.equal(mixedComparison.preservedManual.length, 1);
+  assert.equal(mixedComparison.nextTransactions.length, 2);
+  assert.ok(mixedComparison.nextTransactions.some((row) => row.id === manualRow.id));
+  assert.equal(
+    mixedComparison.nextTransactions.find((row) => row.id === importedOriginal.id).amount,
+    importedOriginal.amount,
+  );
+  assert.equal(
+    mixedComparison.nextTransactions.find((row) => row.id === importedOriginal.id).manuallyModified,
+    undefined,
+  );
+
+  const identityEdited = transactionService.updateLocalTransaction(
+    [importedOriginal],
+    importedOriginal.id,
+    { date: "2026-08-22", type: "despesa" },
+  )[0];
+  const identityComparison = updateService.compareTransactionUpdates(
+    [identityEdited, manualRow],
+    [refreshedImported],
+  );
+  assert.equal(identityComparison.manualEditsOverwritten.length, 1);
+  assert.equal(identityComparison.removed[0].id, importedOriginal.id);
+  assert.ok(identityComparison.nextTransactions.some((row) => row.id === manualRow.id));
+
+  const manualDuplicate = { ...importedOriginal, id: "manual-same", origin: "manual" };
+  const crossSourceDuplicates = updateService.compareTransactionUpdates(
+    [importedOriginal, manualDuplicate],
+    [refreshedImported],
+  );
+  assert.equal(crossSourceDuplicates.nextTransactions.length, 2);
+  assert.equal(crossSourceDuplicates.possibleDuplicates.length, 2);
+  console.log("Lançamentos manuais, avisos de sobrescrita e reimportação segura: OK");
+
   const persisted = localState.serializeLocalState({
     projects: [createdProject],
     activeProjectId: createdProject.id,
@@ -385,6 +483,20 @@ try {
     }),
   );
   assert.deepEqual(legacyReloaded.visibleColumnsByProject, {});
+  const legacyManualReloaded = localState.parseLocalState(
+    JSON.stringify({
+      projects: [createdProject],
+      activeProjectId: createdProject.id,
+      transactionsByProject: {
+        [createdProject.id]: [
+          { ...initial[0], id: "TX-1234", origin: undefined },
+          { ...initial[1], id: "IMP-old", origin: undefined },
+        ],
+      },
+    }),
+  );
+  assert.equal(legacyManualReloaded.transactionsByProject[createdProject.id][0].origin, "manual");
+  assert.equal(legacyManualReloaded.transactionsByProject[createdProject.id][1].origin, undefined);
 
   const memory = new Map();
   const storage = {
@@ -442,7 +554,38 @@ try {
     "estado-anterior",
     "falha de persistência deve manter o estado anterior intacto",
   );
+  const atomicBase = {
+    projects: [createdProject],
+    activeProjectId: createdProject.id,
+    transactionsByProject: { [createdProject.id]: [manualRow] },
+    importProfilesByProject: {},
+    visibleColumnsByProject: {},
+    analyticDimensionsByProject: {},
+  };
+  const atomicNext = localState.replaceProjectTransactionsInLocalState(
+    atomicBase,
+    createdProject.id,
+    [validRevenue.value],
+    "2026-08-14T12:00:00.000Z",
+  );
+  assert.deepEqual(atomicBase.transactionsByProject[createdProject.id], [manualRow]);
+  assert.deepEqual(atomicNext.transactionsByProject[createdProject.id], [validRevenue.value]);
+  assert.throws(() => localState.persistLocalState(fullStorage, atomicNext));
+  assert.deepEqual(atomicBase.transactionsByProject[createdProject.id], [manualRow]);
   console.log("Exclusão persistente permanece após recarga imediata: OK");
+
+  const importRouteSource = await readFile(
+    new URL("../src/routes/importar.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(importRouteSource, /mode:\s*["']create-project["']/);
+  assert.doesNotMatch(importRouteSource, /targetProjectId:\s*project\.id/);
+  const updateDialogSource = await readFile(
+    new URL("../src/components/app/data-update-dialog.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(updateDialogSource, /mode:\s*["']replace-project["']/);
+  console.log("Importação cria projeto e somente Atualizar dados substitui dados existentes: OK");
 
   const intactBeforeInvalid = structuredClone(initial);
   await assert.rejects(

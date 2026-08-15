@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, FileSpreadsheet, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { AppShell } from "@/components/app/app-shell";
 import { ProjectEmptyState } from "@/components/app/project-empty-state";
@@ -74,11 +74,18 @@ function ProjetosPage() {
       description="Cada projeto mantém seus próprios lançamentos e indicadores"
       actions={
         projects.length ? (
-          <Button size="sm" className="gap-1.5" asChild>
-            <Link to="/criar">
-              <Plus className="size-3.5" /> Novo projeto
-            </Link>
-          </Button>
+          <>
+            <Button size="sm" variant="outline" className="gap-1.5" asChild>
+              <Link to="/importar">
+                <FileSpreadsheet className="size-3.5" /> Importar como novo projeto
+              </Link>
+            </Button>
+            <Button size="sm" className="gap-1.5" asChild>
+              <Link to="/criar">
+                <Plus className="size-3.5" /> Novo projeto
+              </Link>
+            </Button>
+          </>
         ) : undefined
       }
     >

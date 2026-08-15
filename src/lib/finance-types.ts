@@ -35,6 +35,16 @@ export type Transaction = {
   amount: number;
   status?: TransactionStatus;
   additionalData?: Record<string, ImportedValue>;
+  origin?: "imported" | "manual";
+  manuallyModified?: boolean;
+};
+
+export type TransactionInput = {
+  date: string;
+  description: string;
+  category: string;
+  type: TransactionType;
+  amount: string;
 };
 
 export type ImportField = "date" | "description" | "category" | "type" | "amount";
@@ -69,6 +79,8 @@ export type TransactionUpdateComparison = {
   unchanged: Transaction[];
   removed: Transaction[];
   possibleDuplicates: Transaction[];
+  manualEditsOverwritten: Transaction[];
+  preservedManual: Transaction[];
   nextTransactions: Transaction[];
 };
 

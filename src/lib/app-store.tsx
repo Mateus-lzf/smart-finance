@@ -14,6 +14,7 @@ import {
   deleteProjectFromLocalState,
   parseLocalState,
   persistLocalState,
+  replaceProjectTransactionsInLocalState,
   type LocalState,
 } from "./local-state-service";
 import { createLocalProject, updateLocalProject } from "./project-service";
@@ -40,7 +41,9 @@ type AppState = {
   commitImportedTransactions: (
     rows: Transaction[],
     profile: ImportProfile,
-    options?: { targetProjectId?: string; newProjectName?: string },
+    destination:
+      | { mode: "replace-project"; targetProjectId: string }
+      | { mode: "create-project"; newProjectName: string },
   ) => Project;
   onboarded: boolean;
   setOnboarded: (value: boolean) => void;
@@ -214,12 +217,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (
       rows: Transaction[],
       profile: ImportProfile,
-      options: { targetProjectId?: string; newProjectName?: string } = {},
+      destination:
+        | { mode: "replace-project"; targetProjectId: string }
+        | { mode: "create-project"; newProjectName: string },
     ) => {
-      const existingId = options.targetProjectId ?? projectId;
+      const existingId =
+        destination.mode === "replace-project" ? destination.targetProjectId : null;
       const created = existingId
         ? null
-        : createLocalProject({ name: options.newProjectName?.trim() ?? "" });
+        : createLocalProject({
+            name: destination.mode === "create-project" ? destination.newProjectName.trim() : "",
+          });
+      if (existingId && !projects.some((item) => item.id === existingId))
+        throw new Error("O projeto selecionado não está mais disponível.");
+      if (created && !created.name) throw new Error("Informe o nome do novo projeto.");
       const id = existingId ?? created!.id;
       const now = new Date().toISOString();
       const nextProjects = created
@@ -260,6 +271,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return next.projects.find((item) => item.id === id)!;
     },
     [
+      projects,
+      transactionsByProject,
+      importProfilesByProject,
+      visibleColumnsByProject,
+      analyticDimensionsByProject,
+    ],
+  );
+
+  const commitTransactionRows = useCallback(
+    (rows: Transaction[]) => {
+      if (!projectId) throw new Error("Selecione um projeto para continuar.");
+      const current: LocalState = {
+        projects,
+        activeProjectId: projectId,
+        transactionsByProject,
+        importProfilesByProject,
+        visibleColumnsByProject,
+        analyticDimensionsByProject,
+      };
+      const next = replaceProjectTransactionsInLocalState(current, projectId, rows);
+      try {
+        persistLocalState(localStorage, next);
+      } catch (cause) {
+        const error = new Error(
+          "Não foi possível salvar no armazenamento local. A alteração não foi aplicada.",
+        );
+        error.cause = cause;
+        throw error;
+      }
+      setProjects(next.projects);
+      setTransactionsByProject(next.transactionsByProject);
+    },
+    [
       projectId,
       projects,
       transactionsByProject,
@@ -271,50 +315,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateTransaction = useCallback(
     (id: string, patch: Partial<Transaction>) => {
-      if (!projectId) return;
-      setTransactionsByProject((current) => ({
-        ...current,
-        [projectId]: updateLocalTransaction(current[projectId] ?? [], id, patch),
-      }));
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === projectId ? { ...project, updatedAt: new Date().toISOString() } : project,
-        ),
+      if (!projectId) throw new Error("Selecione um projeto para continuar.");
+      commitTransactionRows(
+        updateLocalTransaction(transactionsByProject[projectId] ?? [], id, patch),
       );
     },
-    [projectId],
+    [projectId, transactionsByProject, commitTransactionRows],
   );
 
   const addTransaction = useCallback(
     (row: Transaction) => {
-      if (!projectId) return;
-      setTransactionsByProject((current) => ({
-        ...current,
-        [projectId]: addLocalTransaction(current[projectId] ?? [], row),
-      }));
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === projectId ? { ...project, updatedAt: new Date().toISOString() } : project,
-        ),
-      );
+      if (!projectId) throw new Error("Selecione um projeto para continuar.");
+      const current = transactionsByProject[projectId] ?? [];
+      if (current.some((item) => item.id === row.id))
+        throw new Error("Não foi possível gerar um identificador único para o lançamento.");
+      commitTransactionRows(addLocalTransaction(current, row));
     },
-    [projectId],
+    [projectId, transactionsByProject, commitTransactionRows],
   );
 
   const deleteTransaction = useCallback(
     (id: string) => {
-      if (!projectId) return;
-      setTransactionsByProject((current) => ({
-        ...current,
-        [projectId]: deleteLocalTransaction(current[projectId] ?? [], id),
-      }));
-      setProjects((current) =>
-        current.map((project) =>
-          project.id === projectId ? { ...project, updatedAt: new Date().toISOString() } : project,
-        ),
-      );
+      if (!projectId) throw new Error("Selecione um projeto para continuar.");
+      commitTransactionRows(deleteLocalTransaction(transactionsByProject[projectId] ?? [], id));
     },
-    [projectId],
+    [projectId, transactionsByProject, commitTransactionRows],
   );
 
   const getProjectTransactions = useCallback(

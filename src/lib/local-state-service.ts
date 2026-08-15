@@ -14,10 +14,20 @@ export type LocalState = {
 
 export function parseLocalState(raw: string): LocalState {
   const parsed = JSON.parse(raw) as Partial<LocalState>;
+  const transactionsByProject = Object.fromEntries(
+    Object.entries(parsed.transactionsByProject ?? {}).map(([projectId, rows]) => [
+      projectId,
+      Array.isArray(rows)
+        ? rows.map((row) =>
+            !row.origin && /^TX-\d{4}$/.test(row.id) ? { ...row, origin: "manual" as const } : row,
+          )
+        : [],
+    ]),
+  );
   return {
     projects: Array.isArray(parsed.projects) ? parsed.projects : [],
     activeProjectId: parsed.activeProjectId ?? null,
-    transactionsByProject: parsed.transactionsByProject ?? {},
+    transactionsByProject,
     importProfilesByProject: parsed.importProfilesByProject ?? {},
     visibleColumnsByProject: parsed.visibleColumnsByProject ?? {},
     analyticDimensionsByProject: parsed.analyticDimensionsByProject ?? {},
@@ -30,6 +40,23 @@ export function serializeLocalState(state: LocalState) {
 
 export function persistLocalState(storage: Pick<Storage, "setItem">, state: LocalState) {
   storage.setItem(LOCAL_STATE_KEY, serializeLocalState(state));
+}
+
+export function replaceProjectTransactionsInLocalState(
+  state: LocalState,
+  projectId: string,
+  rows: Transaction[],
+  now = new Date().toISOString(),
+): LocalState {
+  if (!state.projects.some((project) => project.id === projectId))
+    throw new Error("O projeto selecionado não está mais disponível.");
+  return {
+    ...state,
+    projects: state.projects.map((project) =>
+      project.id === projectId ? { ...project, updatedAt: now } : project,
+    ),
+    transactionsByProject: { ...state.transactionsByProject, [projectId]: rows },
+  };
 }
 
 export function deleteProjectFromLocalState(state: LocalState, projectId: string): LocalState {

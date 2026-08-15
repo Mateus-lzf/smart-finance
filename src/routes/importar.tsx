@@ -48,7 +48,7 @@ const steps = [
 
 function ImportPage() {
   const navigate = useNavigate();
-  const { project, commitImportedTransactions } = useApp();
+  const { commitImportedTransactions } = useApp();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<ColumnMapping | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -81,7 +81,7 @@ function ImportPage() {
       commitImportedTransactions(
         rows,
         { headers: parsed.headers, columns: parsed.columns, mapping: selectedMapping },
-        project ? { targetProjectId: project.id } : { newProjectName },
+        { mode: "create-project", newProjectName },
       );
       setStep(4);
       setStep(steps.length);
@@ -100,7 +100,7 @@ function ImportPage() {
     try {
       const parsed = await readImportFile(file);
       setStep(1);
-      if (parsed.missingFields.length || !project) {
+      if (parsed.missingFields.length || !newProjectName.trim()) {
         setPreview(parsed);
         setMapping(parsed.mapping);
         setStep(-1);
@@ -114,9 +114,7 @@ function ImportPage() {
   };
 
   const readyToMap =
-    mapping &&
-    importFields.every(({ key }) => mapping[key]) &&
-    (Boolean(project) || Boolean(newProjectName.trim()));
+    mapping && importFields.every(({ key }) => mapping[key]) && Boolean(newProjectName.trim());
 
   return (
     <div className="flex min-h-screen items-center justify-center px-5 py-16">
@@ -151,18 +149,16 @@ function ImportPage() {
                 </div>
               </div>
 
-              {!project && (
-                <div className="mt-5 max-w-sm space-y-1.5 text-left">
-                  <Label htmlFor="import-project-name">Nome do novo projeto</Label>
-                  <Input
-                    id="import-project-name"
-                    autoFocus
-                    value={newProjectName}
-                    onChange={(event) => setNewProjectName(event.target.value)}
-                    placeholder="Ex.: Minha empresa"
-                  />
-                </div>
-              )}
+              <div className="mt-5 max-w-sm space-y-1.5 text-left">
+                <Label htmlFor="import-project-name">Nome do novo projeto</Label>
+                <Input
+                  id="import-project-name"
+                  autoFocus
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                  placeholder="Ex.: Minha empresa"
+                />
+              </div>
 
               {preview.missingFields.length > 0 && (
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -235,6 +231,10 @@ function ImportPage() {
               <h1 className="text-2xl font-semibold tracking-tight">Importe sua planilha</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 Aceitamos .xlsx e .csv com data, descrição, categoria, tipo e valor.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A importação cria um novo projeto. Para substituir dados existentes, use Atualizar
+                dados na tela Dados.
               </p>
 
               {error && (
