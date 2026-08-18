@@ -1,5 +1,6 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { AppProvider } from "@/lib/app-store";
+import { AuthProvider } from "@/lib/auth/auth-provider";
 import { getAuthState } from "@/lib/auth/auth-functions";
 import { sanitizeInternalRedirect } from "@/lib/auth/safe-redirect";
 
@@ -25,9 +26,12 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedApplication() {
+  const { user } = Route.useRouteContext();
   return (
-    <AppProvider>
-      <Outlet />
-    </AppProvider>
+    <AuthProvider initialUser={user}>
+      <AppProvider>
+        <Outlet />
+      </AppProvider>
+    </AuthProvider>
   );
 }

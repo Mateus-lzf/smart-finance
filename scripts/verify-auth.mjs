@@ -477,11 +477,26 @@ try {
     const routeSources = await Promise.all([
       readFile("src/routes/_authenticated.tsx", "utf8"),
       readFile("src/routes/__root.tsx", "utf8"),
+      readFile("src/lib/auth/auth-provider.tsx", "utf8"),
+      readFile("src/components/app/app-shell.tsx", "utf8"),
+      readFile("src/routes/_authenticated/configuracoes.tsx", "utf8"),
     ]);
     assert.doesNotMatch(
       routeSources.join("\n"),
       /technical-project-functions|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
       "product routes do not connect the technical remote vertical or financial tables",
+    );
+    assert.doesNotMatch(
+      routeSources.join("\n"),
+      /localStorage|STORAGE_KEY|smart-finance-state/,
+      "authentication and account UI never reads, writes, clears or namespaces financial localStorage",
+    );
+    const authProviderSource = routeSources[2];
+    assert.match(authProviderSource, /createContext/);
+    assert.doesNotMatch(
+      authProviderSource,
+      /useApp|AppProvider|project|transaction/i,
+      "AuthProvider remains independent from financial application state",
     );
 
     const unavailableOrigin = "http://127.0.0.1:3001";

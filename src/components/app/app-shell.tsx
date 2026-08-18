@@ -8,11 +8,15 @@ import {
   ChevronsUpDown,
   Plus,
   Menu,
+  HardDrive,
+  LogOut,
+  UserRound,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/lib/app-store";
+import { useAuth } from "@/lib/auth/auth-provider";
 import { appNavigation } from "@/lib/app-navigation";
 import { PRODUCT_NAME } from "@/lib/product-config";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -24,6 +28,57 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+
+function AccountSummary({ collapsed = false }: { collapsed?: boolean }) {
+  const { user, logout, signingOut } = useAuth();
+
+  async function handleLogout() {
+    const ok = await logout();
+    if (!ok) toast.error("Não foi possível sair agora. Tente novamente.");
+  }
+
+  if (collapsed) {
+    return (
+      <button
+        onClick={handleLogout}
+        disabled={signingOut}
+        className="grid w-full place-items-center rounded-lg py-2 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground"
+        title={`Sair de ${user.email ?? "sua conta"}`}
+        aria-label="Sair da conta"
+      >
+        <LogOut className="size-4" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-sidebar-border p-2.5">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-sidebar-hover text-sidebar-primary">
+          <UserRound className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-xs font-medium text-sidebar-foreground">
+            {user.email ?? "Conta Smart Finance"}
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-sidebar-foreground/60">
+            <HardDrive className="size-3" /> Dados neste dispositivo
+          </p>
+        </div>
+        <button
+          onClick={handleLogout}
+          disabled={signingOut}
+          className="grid size-8 shrink-0 place-items-center rounded-lg text-sidebar-foreground/55 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground disabled:opacity-50"
+          title="Sair da conta"
+          aria-label="Sair da conta"
+        >
+          <LogOut className="size-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
   const { project, projects, setProjectId } = useApp();
@@ -154,9 +209,11 @@ export function AppShell({
         </nav>
 
         <div className="p-2">
+          <AccountSummary collapsed={collapsed} />
           <button
             onClick={() => setCollapsed((c) => !c)}
             className={cn(
+              "mt-1",
               "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-hover hover:text-sidebar-foreground",
               collapsed && "justify-center px-0",
             )}
@@ -192,7 +249,7 @@ export function AppShell({
         <main className="flex-1 px-5 py-6 md:px-8">{children}</main>
       </div>
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left" className="w-[280px] bg-sidebar p-3">
+        <SheetContent side="left" className="flex w-[280px] flex-col bg-sidebar p-3">
           <SheetHeader className="px-1 py-2 text-left">
             <SheetTitle className="flex items-center gap-2 text-[15px]">
               <span className="grid size-8 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -223,6 +280,9 @@ export function AppShell({
               );
             })}
           </nav>
+          <div className="mt-auto pt-4">
+            <AccountSummary />
+          </div>
         </SheetContent>
       </Sheet>
     </div>
