@@ -28,7 +28,7 @@ import type { PossibleDuplicateGroup } from "@/lib/finance-types";
 import { groupPossibleDuplicates } from "@/lib/transaction-update-service";
 import { productTitle } from "@/lib/product-config";
 
-export const Route = createFileRoute("/importar")({
+export const Route = createFileRoute("/_authenticated/importar")({
   head: () => ({
     meta: [
       { title: productTitle("Importar planilha") },

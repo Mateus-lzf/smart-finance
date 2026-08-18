@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/lib/app-store";
 
-export const Route = createFileRoute("/criar")({
+export const Route = createFileRoute("/_authenticated/criar")({
   head: () => ({ meta: [{ title: productTitle("Criar projeto") }] }),
   component: CreateProjectPage,
 });

@@ -16,7 +16,7 @@ import { productTitle } from "@/lib/product-config";
 import { analyzeInsights } from "@/lib/insight-service";
 import { useApp } from "@/lib/app-store";
 
-export const Route = createFileRoute("/insights")({
+export const Route = createFileRoute("/_authenticated/insights")({
   head: () => ({ meta: [{ title: productTitle("Insights financeiros") }] }),
   component: InsightsPage,
 });

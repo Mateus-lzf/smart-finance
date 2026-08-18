@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { persistTheme, readStoredTheme, type Theme } from "@/lib/theme-service";
 
-export const Route = createFileRoute("/configuracoes")({
+export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
     meta: [
       { title: productTitle("Configurações da conta") },

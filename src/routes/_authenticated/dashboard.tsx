@@ -20,7 +20,7 @@ import { useApp } from "@/lib/app-store";
 import { buildDashboardAnalysis } from "@/lib/dashboard-service";
 import { productTitle } from "@/lib/product-config";
 
-export const Route = createFileRoute("/dashboard")({
+export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
     meta: [
       { title: productTitle("Dashboard financeiro") },

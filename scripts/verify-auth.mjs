@@ -81,11 +81,11 @@ function createRpcModule(serverModule) {
   });
 }
 
-async function waitForServer() {
+async function waitForServer(origin = APP_ORIGIN) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
-      const response = await fetch(APP_ORIGIN, { redirect: "manual" });
-      if (response.status < 500) return;
+      await fetch(`${origin}/favicon.ico`, { redirect: "manual" });
+      return;
     } catch {
       // The development server is still starting.
     }
@@ -94,26 +94,30 @@ async function waitForServer() {
   throw new Error("O servidor Vite não iniciou para o teste de Auth.");
 }
 
-async function confirmEmail(mailpitUrl, email) {
+async function consumeAuthEmail(mailpitUrl, email, expectedType) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const list = await fetch(`${mailpitUrl}/api/v1/messages`).then((response) => response.json());
-    const message = list.messages?.find((item) =>
+    const messages = (list.messages ?? []).filter((item) =>
       item.To?.some((recipient) => recipient.Address === email),
     );
-    if (message) {
+    for (const message of messages) {
       const detail = await fetch(`${mailpitUrl}/api/v1/message/${message.ID}`).then((response) =>
         response.json(),
       );
       const content = `${detail.Text ?? ""}\n${detail.HTML ?? ""}`.replaceAll("&amp;", "&");
       const match = content.match(/https?:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/);
-      assert.ok(match, `confirmation link exists for ${email}`);
+      if (!match) continue;
+      const verificationUrl = new URL(match[0]);
+      if (verificationUrl.searchParams.get("type") !== expectedType) continue;
       const verified = await fetch(match[0], { redirect: "manual" });
-      assert.ok([302, 303].includes(verified.status), `confirmation succeeds for ${email}`);
-      return;
+      assert.ok([302, 303].includes(verified.status), `${expectedType} verification succeeds`);
+      const redirectLocation = verified.headers.get("location");
+      assert.ok(redirectLocation, `${expectedType} verification returns an application callback`);
+      return redirectLocation;
     }
     await delay(250);
   }
-  throw new Error(`Mailpit não recebeu a confirmação para ${email}.`);
+  throw new Error(`Mailpit não recebeu o e-mail ${expectedType} para ${email}.`);
 }
 
 const local = readLocalSupabaseStatus();
@@ -170,7 +174,28 @@ try {
       "runtime authentication code has no privileged credential path",
     );
 
+    const safeRedirect = await vite.ssrLoadModule("/src/lib/auth/safe-redirect.ts");
+    assert.equal(safeRedirect.sanitizeInternalRedirect("/dados?pagina=2"), "/dados?pagina=2");
+    assert.equal(safeRedirect.sanitizeInternalRedirect("https://evil.example"), "/dashboard");
+    assert.equal(safeRedirect.sanitizeInternalRedirect("//evil.example"), "/dashboard");
+    assert.equal(safeRedirect.sanitizeInternalRedirect("/auth/callback?code=secret"), "/dashboard");
+    assert.deepEqual(auth.classifySessionFailure({ message: "JWT expired", status: 401 }), {
+      status: "unauthenticated",
+      reason: "expired",
+    });
+    assert.deepEqual(auth.classifySessionFailure({ name: "AuthRetryableFetchError", status: 0 }), {
+      status: "unavailable",
+    });
+
     const anonymous = createCookieFetch();
+    const privateWithoutSession = await anonymous.request("/dashboard");
+    assert.ok(
+      [302, 307].includes(privateWithoutSession.status),
+      "private route redirects anonymously",
+    );
+    const loginLocation = new URL(privateWithoutSession.headers.get("location"), APP_ORIGIN);
+    assert.equal(loginLocation.pathname, "/login");
+    assert.equal(loginLocation.searchParams.get("redirect"), "/dashboard");
     await assert.rejects(
       () => projects.listTechnicalProjects({ fetch: anonymous.request }),
       /Server Function rejected the request/,
@@ -187,12 +212,64 @@ try {
     for (let index = 0; index < accounts.length; index += 1) {
       const account = accounts[index];
       const signup = await auth.signUp({
-        data: { email: account.email, password: account.password, displayName: account.name },
+        data: {
+          email: account.email,
+          password: account.password,
+          displayName: account.name,
+          next: index === 0 ? "//evil.example" : "/dados",
+        },
         fetch: clients[index].request,
       });
       assert.equal(signup.ok, true, `signup succeeds for user ${index + 1}`);
-      await confirmEmail(local.MAILPIT_URL, account.email);
+      if (index === 0) {
+        await delay(1100);
+        assert.equal(
+          (
+            await auth.resendSignupConfirmation({
+              data: { email: account.email, next: "/dashboard" },
+              fetch: clients[index].request,
+            })
+          ).ok,
+          true,
+          "confirmation email can be resent",
+        );
+      }
+      const callbackUrl = await consumeAuthEmail(local.MAILPIT_URL, account.email, "signup");
+      const callbackResponse = await clients[index].request(callbackUrl);
+      assert.ok(
+        [302, 307].includes(callbackResponse.status),
+        "PKCE callback redirects after exchange",
+      );
+      const callbackDestination = new URL(callbackResponse.headers.get("location"), APP_ORIGIN);
+      assert.equal(
+        callbackDestination.pathname,
+        index === 0 ? "/dashboard" : "/dados",
+        "callback uses only the sanitized internal destination",
+      );
+      const confirmedUser = await auth.getCurrentUser({ fetch: clients[index].request });
+      assert.equal(confirmedUser.email, account.email, "PKCE callback establishes the session");
+      const reusedCallback = await clients[index].request(callbackUrl);
+      assert.ok([302, 307].includes(reusedCallback.status), "reused callback is handled safely");
+      const reusedDestination = new URL(reusedCallback.headers.get("location"), APP_ORIGIN);
+      assert.equal(reusedDestination.pathname, "/login");
+      assert.equal(reusedDestination.searchParams.get("authError"), "invalid_callback");
     }
+
+    const missingCallback = await anonymous.request("/auth/callback");
+    assert.ok(
+      [302, 307].includes(missingCallback.status),
+      "missing callback code redirects safely",
+    );
+    assert.equal(
+      new URL(missingCallback.headers.get("location"), APP_ORIGIN).searchParams.get("authError"),
+      "invalid_callback",
+    );
+    const invalidCallback = await anonymous.request("/auth/callback?code=invalid-code");
+    assert.ok([302, 307].includes(invalidCallback.status), "invalid callback redirects safely");
+    assert.equal(
+      new URL(invalidCallback.headers.get("location"), APP_ORIGIN).searchParams.get("authError"),
+      "invalid_callback",
+    );
 
     const invalidLogin = await auth.signIn({
       data: { email: accounts[0].email, password: "SenhaIncorreta123!" },
@@ -211,6 +288,39 @@ try {
       assert.equal(current.email, accounts[index].email, `server validates user ${index + 1}`);
     }
 
+    for (const url of [
+      "/",
+      "/dashboard",
+      "/dados",
+      "/insights",
+      "/relatorios",
+      "/projetos",
+      "/importar",
+      "/criar",
+      "/configuracoes",
+    ]) {
+      const response = await clients[0].request(url);
+      assert.equal(response.status, 200, `${url} keeps its public URL when authenticated`);
+    }
+
+    const authenticatedLogin = await clients[0].request("/login?redirect=%2Fdados");
+    assert.ok([302, 307].includes(authenticatedLogin.status));
+    assert.equal(
+      new URL(authenticatedLogin.headers.get("location"), APP_ORIGIN).pathname,
+      "/dados",
+      "login returns to the originally requested internal route",
+    );
+    for (const unsafeRedirect of ["https://evil.example", "//evil.example"]) {
+      const response = await clients[0].request(
+        `/login?redirect=${encodeURIComponent(unsafeRedirect)}`,
+      );
+      assert.equal(
+        new URL(response.headers.get("location"), APP_ORIGIN).pathname,
+        "/dashboard",
+        "unsafe post-login redirect falls back to dashboard",
+      );
+    }
+
     const invalidSession = createCookieFetch();
     for (const cookieName of clients[0].cookies.keys()) {
       invalidSession.cookies.set(cookieName, "invalid-session-token");
@@ -224,6 +334,18 @@ try {
       () => projects.listTechnicalProjects({ fetch: invalidSession.request }),
       /Server Function rejected the request/,
       "invalid session cannot access protected Server Functions",
+    );
+    const invalidSessionRoute = await invalidSession.request("/dashboard");
+    assert.ok([302, 307].includes(invalidSessionRoute.status));
+    const invalidSessionDestination = new URL(
+      invalidSessionRoute.headers.get("location"),
+      APP_ORIGIN,
+    );
+    assert.equal(invalidSessionDestination.pathname, "/login");
+    assert.equal(
+      invalidSessionDestination.searchParams.get("reason"),
+      "session_expired",
+      "invalid session redirects once with a factual reason",
     );
 
     const projectA = await projects.createTechnicalProject({
@@ -276,6 +398,62 @@ try {
       accounts[0].email,
       "refresh preserves the authenticated identity",
     );
+
+    const recoveryClient = createCookieFetch();
+    assert.equal(
+      (
+        await auth.requestPasswordRecovery({
+          data: { email: accounts[1].email },
+          fetch: recoveryClient.request,
+        })
+      ).ok,
+      true,
+      "password recovery request is accepted",
+    );
+    const recoveryCallbackUrl = await consumeAuthEmail(
+      local.MAILPIT_URL,
+      accounts[1].email,
+      "recovery",
+    );
+    const recoveryCallback = await recoveryClient.request(recoveryCallbackUrl);
+    assert.ok(
+      [302, 307].includes(recoveryCallback.status),
+      "recovery callback exchanges PKCE code",
+    );
+    assert.equal(
+      new URL(recoveryCallback.headers.get("location"), APP_ORIGIN).pathname,
+      "/redefinir-senha",
+    );
+    const replacementPassword = "NovaSenhaSeguraB456!";
+    assert.equal(
+      (
+        await auth.updateRecoveredPassword({
+          data: { password: replacementPassword },
+          fetch: recoveryClient.request,
+        })
+      ).ok,
+      true,
+      "authenticated recovery session can redefine the password",
+    );
+    await auth.signOut({ fetch: recoveryClient.request });
+    assert.deepEqual(
+      await auth.signIn({
+        data: { email: accounts[1].email, password: accounts[1].password },
+        fetch: recoveryClient.request,
+      }),
+      { ok: false, code: "invalid_credentials" },
+      "old password no longer authenticates",
+    );
+    assert.equal(
+      (
+        await auth.signIn({
+          data: { email: accounts[1].email, password: replacementPassword },
+          fetch: recoveryClient.request,
+        })
+      ).ok,
+      true,
+      "new password authenticates",
+    );
     assert.equal((await auth.signOut({ fetch: clients[0].request })).ok, true, "logout succeeds");
     assert.equal(
       await auth.getCurrentUser({ fetch: clients[0].request }),
@@ -287,6 +465,72 @@ try {
       /Server Function rejected the request/,
       "logged-out session cannot access protected Server Functions",
     );
+
+    const localStateFiles = spawnSync("git", [
+      "diff",
+      "--quiet",
+      "--",
+      "src/lib/app-store.tsx",
+      "src/lib/local-state-service.ts",
+    ]);
+    assert.equal(localStateFiles.status, 0, "financial localStorage implementation is unchanged");
+    const routeSources = await Promise.all([
+      readFile("src/routes/_authenticated.tsx", "utf8"),
+      readFile("src/routes/__root.tsx", "utf8"),
+    ]);
+    assert.doesNotMatch(
+      routeSources.join("\n"),
+      /technical-project-functions|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
+      "product routes do not connect the technical remote vertical or financial tables",
+    );
+
+    const unavailableOrigin = "http://127.0.0.1:3001";
+    const unavailableServer = spawn(
+      viteBin,
+      ["--host", "127.0.0.1", "--port", "3001", "--strictPort"],
+      {
+        cwd: process.cwd(),
+        env: { ...env, VITE_SUPABASE_URL: "http://127.0.0.1:59999" },
+        stdio: "ignore",
+        shell: process.platform === "win32",
+      },
+    );
+    try {
+      await waitForServer(unavailableOrigin);
+      const authenticatedCookieHeader = [...recoveryClient.cookies]
+        .map(([name, value]) => `${name}=${value}`)
+        .join("; ");
+      const unavailableResponse = await fetch(`${unavailableOrigin}/dashboard`, {
+        headers: { cookie: authenticatedCookieHeader },
+        redirect: "manual",
+      });
+      assert.ok([302, 307].includes(unavailableResponse.status));
+      const unavailableLocation = new URL(
+        unavailableResponse.headers.get("location"),
+        unavailableOrigin,
+      );
+      assert.equal(
+        unavailableLocation.pathname,
+        "/auth-indisponivel",
+        "Auth outage uses a public non-recursive failure route",
+      );
+      const unavailablePage = await fetch(`${unavailableOrigin}/auth-indisponivel`, {
+        redirect: "manual",
+      });
+      assert.equal(
+        unavailablePage.status,
+        200,
+        "Auth outage page never rechecks Auth or redirects",
+      );
+    } finally {
+      if (process.platform === "win32") {
+        spawnSync("taskkill", ["/pid", String(unavailableServer.pid), "/t", "/f"], {
+          stdio: "ignore",
+        });
+      } else {
+        unavailableServer.kill("SIGTERM");
+      }
+    }
 
     console.log("Auth/session/RLS verification passed.");
   });

@@ -575,7 +575,7 @@ try {
   console.log("Exclusão persistente permanece após recarga imediata: OK");
 
   const importRouteSource = await readFile(
-    new URL("../src/routes/importar.tsx", import.meta.url),
+    new URL("../src/routes/_authenticated/importar.tsx", import.meta.url),
     "utf8",
   );
   assert.match(importRouteSource, /mode:\s*["']create-project["']/);

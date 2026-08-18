@@ -4,7 +4,7 @@ import { ProjectEmptyState } from "@/components/app/project-empty-state";
 import { productTitle } from "@/lib/product-config";
 import { useApp } from "@/lib/app-store";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: productTitle("Organização financeira para o seu negócio") },

@@ -23,7 +23,7 @@ import { productTitle } from "@/lib/product-config";
 import type { Project } from "@/lib/finance-types";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/projetos")({
+export const Route = createFileRoute("/_authenticated/projetos")({
   head: () => ({ meta: [{ title: productTitle("Seus projetos financeiros") }] }),
   component: ProjetosPage,
 });
