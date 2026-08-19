@@ -93,7 +93,93 @@ financial persistence, feature flags, and local-data migration remain future wor
 Existing financial data is not uploaded, associated with an account, copied, renamed, or removed.
 Authentication and financial application state intentionally remain separate.
 
-## Remote environments
+## Environment separation
 
-There is deliberately no remote project linked in Sprint 14A. Do not run `supabase login`,
-`supabase link`, `supabase db push`, or `supabase db reset --linked` as part of this sprint.
+`npm run dev` remains the default local workflow and reads `.env.local`. It must keep pointing to
+the Docker-hosted Supabase URL. Copy `.env.example` to `.env.local` and use the browser-safe values
+reported by `supabase status`.
+
+Remote staging is deliberately opt-in and uses a different Vite mode. Its ignored runtime file is
+`.env.staging.local`, created from `.env.staging.example`. Do not put staging values in `.env.local`,
+and never put production values in either file.
+
+```sh
+# local, offline-friendly development
+npm run db:start
+npm run dev
+
+# future remote staging, only after Checkpoint 15B links the approved project
+npm run dev:staging
+```
+
+The financial product UI still reads only AppStore and localStorage. Selecting the staging Auth
+endpoint does not migrate, upload, namespace, or dual-write projects and transactions.
+
+## Remote staging safety guard
+
+Checkpoint 15A prepares remote commands but does not create or link a project. The only supported
+remote database scripts are intentionally environment-specific:
+
+```sh
+npm run db:staging:check
+npm run db:staging:plan
+npm run db:staging:push -- --confirm-project-ref=<staging-project-ref>
+```
+
+There is intentionally no generic `db:push` script.
+
+All three scripts refuse to proceed unless:
+
+- `.env.staging.local` declares `SMART_FINANCE_REMOTE_ENVIRONMENT=staging`;
+- the project ref has the expected hosted format;
+- `VITE_SUPABASE_URL` exactly matches that project ref over HTTPS;
+- the key is an `sb_publishable_` key;
+- no privileged key/password variable is present;
+- `supabase/.temp/project-ref` exists and exactly matches the declared staging ref;
+- every file under `supabase/migrations/` is committed and unchanged.
+
+`db:staging:check` performs only local validation. `db:staging:plan` runs
+`supabase db push --dry-run`. `db:staging:push` first repeats the dry-run, then requires both the
+exact `--confirm-project-ref` argument and this process-only environment confirmation:
+
+```text
+SMART_FINANCE_STAGING_APPLY=APPLY_TO_STAGING_<staging-project-ref>
+```
+
+The link is checked again between dry-run and application. Never add that confirmation to an env
+file. Never run `supabase db reset --linked`; it is destructive to the linked remote database.
+
+Run the guard's offline unit checks with:
+
+```sh
+npm run test:staging:guard
+```
+
+## Opt-in remote smoke test
+
+`npm run test:staging` is prepared for Checkpoint 15C but must not be run during 15A. It requires:
+
+- a validated staging link and configuration;
+- `.env.staging.test.local` copied from `.env.staging.test.example`;
+- the explicit remote-test confirmation value;
+- two distinct, confirmed, disposable staging-only users.
+
+It authenticates both users with the publishable key, proves anonymous rejection and cross-user RLS,
+creates one clearly named technical project, and removes that fixture in `finally`. It neither
+imports nor reads local financial data. This network-dependent test is intentionally excluded from
+`npm test` and `db:verify`.
+
+## Remote operations lifecycle
+
+Checkpoint 15A must end with no remote link. In 15B, after separate approval, the operator will:
+
+1. create the dedicated staging project manually in the controlled Supabase organization;
+2. copy only its ref, URL, and publishable key into ignored local files;
+3. run `supabase login` and `supabase link --project-ref <exact-ref>` explicitly;
+4. run `db:staging:check` and inspect the printed ref and URL;
+5. run `db:staging:plan` and review every pending migration;
+6. obtain approval before running the doubly confirmed staging push;
+7. remove the local link after the checkpoint when it is no longer needed.
+
+Production will use another Supabase project, another application deployment, and another approval
+workflow. Staging files and scripts must never be repurposed for production.
