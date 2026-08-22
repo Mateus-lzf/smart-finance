@@ -30,13 +30,44 @@ export function validateCloudflareConfig(config) {
   if (staging.vars?.SMART_FINANCE_ENVIRONMENT !== "staging") {
     throw new Error("The Worker runtime environment must be exactly staging.");
   }
+  let supabaseUrl;
+  try {
+    supabaseUrl = new URL(staging.vars?.VITE_SUPABASE_URL);
+  } catch {
+    throw new Error("The staging Worker requires a valid VITE_SUPABASE_URL runtime binding.");
+  }
+  if (supabaseUrl.protocol !== "https:" || !supabaseUrl.hostname.endsWith(".supabase.co")) {
+    throw new Error(
+      "The staging Worker Supabase URL must use HTTPS and the Supabase hosted domain.",
+    );
+  }
+  if (!/^sb_publishable_[A-Za-z0-9_-]+$/.test(staging.vars?.VITE_SUPABASE_PUBLISHABLE_KEY ?? "")) {
+    throw new Error("The staging Worker requires only an sb_publishable_ Supabase key.");
+  }
   if (config.assets?.directory !== ".output/public" || config.assets?.binding !== "ASSETS") {
     throw new Error("Wrangler static assets must point to the Nitro public output.");
   }
   if (!(config.compatibility_flags ?? []).includes("nodejs_compat")) {
     throw new Error("The current Nitro output requires nodejs_compat.");
   }
-  return { workerName: staging.name, environment: staging.vars.SMART_FINANCE_ENVIRONMENT };
+  return {
+    workerName: staging.name,
+    environment: staging.vars.SMART_FINANCE_ENVIRONMENT,
+    supabaseUrl: supabaseUrl.href,
+    supabasePublishableKey: staging.vars.VITE_SUPABASE_PUBLISHABLE_KEY,
+  };
+}
+
+export function assertCloudflareSupabaseConfig(cloudflare, supabase) {
+  const runtime = validateCloudflareConfig(cloudflare);
+  if (
+    runtime.supabaseUrl !== supabase.url ||
+    runtime.supabasePublishableKey !== supabase.publishableKey
+  ) {
+    throw new Error(
+      "Cloudflare staging Supabase bindings do not match the approved staging environment.",
+    );
+  }
 }
 
 export function readCloudflareConfig(cwd = process.cwd()) {

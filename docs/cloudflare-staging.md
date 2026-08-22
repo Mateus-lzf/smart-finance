@@ -14,9 +14,14 @@ create a Worker, configure Access, or modify Supabase.
 - Versioned preview URLs are disabled.
 - No production environment exists in this checkpoint.
 
-The runtime receives only `SMART_FINANCE_ENVIRONMENT=staging`. Supabase URL and publishable key are
-browser-safe build-time values loaded by `vite build --mode staging`. The Worker has no database
-password, connection string, service role, secret key, or admin key.
+The runtime receives `SMART_FINANCE_ENVIRONMENT=staging` plus the two public Supabase settings:
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. Browser code reads these browser-safe values
+from `import.meta.env`, while Server Functions read the Worker bindings from `process.env` inside each
+request. The staging guard requires the runtime bindings to match `.env.staging.local` exactly.
+
+These public settings identify the Supabase project and authorize only the public client role; RLS
+remains the data-access boundary. The Worker has no database password, connection string, service
+role, secret key, or admin key. A future production environment must define its own independent vars.
 
 ## Local preparation and dry-run
 
@@ -27,8 +32,9 @@ npm run cloudflare:staging:plan
 ```
 
 `cloudflare:staging:plan` validates the committed Wrangler contract, Supabase staging URL/ref/link,
-Nitro artifacts, and then runs Wrangler with `deploy --dry-run`. It writes only local output under
-`.wrangler/staging-dry-run` and neither authenticates nor uploads anything.
+the exact equality of the Vite and Worker public Supabase settings, Nitro artifacts, and then runs
+Wrangler with `deploy --dry-run`. It writes only local output under `.wrangler/staging-dry-run` and
+neither authenticates nor uploads anything.
 
 ## Future remote identity check
 

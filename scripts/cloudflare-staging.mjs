@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   assertBuildArtifacts,
+  assertCloudflareSupabaseConfig,
   assertExpectedCloudflareAccount,
   loadCloudflareIdentity,
   readCloudflareConfig,
@@ -36,6 +37,7 @@ function validateLocalDeploymentInputs() {
   assertSupabaseStagingLink(supabase);
   const wrangler = readCloudflareConfig();
   validateCloudflareConfig(wrangler);
+  assertCloudflareSupabaseConfig(wrangler, supabase);
   assertBuildArtifacts();
   return { supabase, wrangler };
 }

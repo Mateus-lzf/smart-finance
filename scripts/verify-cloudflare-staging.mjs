@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createServer } from "vite";
 import {
+  assertCloudflareSupabaseConfig,
   assertExpectedCloudflareAccount,
   readCloudflareConfig,
   validateCloudflareConfig,
@@ -9,7 +10,10 @@ import {
 } from "./lib/cloudflare-staging.mjs";
 
 const config = readCloudflareConfig();
-assert.equal(validateCloudflareConfig(config).workerName, "smart-finance-staging");
+const runtimeConfig = validateCloudflareConfig(config);
+assert.equal(runtimeConfig.workerName, "smart-finance-staging");
+assert.match(runtimeConfig.supabaseUrl, /^https:\/\/[a-z0-9]+\.supabase\.co\/$/);
+assert.match(runtimeConfig.supabasePublishableKey, /^sb_publishable_/);
 assert.equal(config.preview_urls, false);
 assert.equal(config.env.staging.preview_urls, false);
 assert.equal(config.env.production, undefined);
@@ -36,6 +40,42 @@ assert.throws(() =>
 assert.throws(() =>
   validateCloudflareConfig({ ...config, env: { ...config.env, production: {} } }),
 );
+assert.throws(() =>
+  validateCloudflareConfig({
+    ...config,
+    env: {
+      ...config.env,
+      staging: {
+        ...config.env.staging,
+        vars: { ...config.env.staging.vars, VITE_SUPABASE_URL: undefined },
+      },
+    },
+  }),
+);
+assert.throws(() =>
+  validateCloudflareConfig({
+    ...config,
+    env: {
+      ...config.env,
+      staging: {
+        ...config.env.staging,
+        vars: { ...config.env.staging.vars, VITE_SUPABASE_PUBLISHABLE_KEY: "service-role-value" },
+      },
+    },
+  }),
+);
+assert.doesNotThrow(() =>
+  assertCloudflareSupabaseConfig(config, {
+    url: runtimeConfig.supabaseUrl,
+    publishableKey: runtimeConfig.supabasePublishableKey,
+  }),
+);
+assert.throws(() =>
+  assertCloudflareSupabaseConfig(config, {
+    url: "https://differentprojectref.supabase.co/",
+    publishableKey: runtimeConfig.supabasePublishableKey,
+  }),
+);
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
 try {
@@ -59,5 +99,10 @@ const serverSource = await readFile("src/server.ts", "utf8");
 assert.match(serverSource, /SMART_FINANCE_ENVIRONMENT/);
 assert.match(serverSource, /X-Robots-Tag/);
 assert.ok(serverSource.includes("Disallow: /\\n"));
+
+const browserClientSource = await readFile("src/lib/supabase/browser-client.ts", "utf8");
+const serverClientSource = await readFile("src/lib/supabase/server-client.ts", "utf8");
+assert.match(browserClientSource, /readPublicSupabaseEnv\(\)/);
+assert.match(serverClientSource, /readPublicSupabaseEnv\(process\.env\)/);
 
 console.log("Cloudflare staging config, guards, log redaction and indexing checks passed locally.");

@@ -24,6 +24,8 @@
       "preview_urls": false,
       "vars": {
         "SMART_FINANCE_ENVIRONMENT": "staging",
+        "VITE_SUPABASE_URL": "https://eemksphblfgjizhhcdhm.supabase.co",
+        "VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_dgVJ8IMklPAa7mppHwDzgQ_VYYeVl0e",
       },
       "observability": {
         "enabled": true,
