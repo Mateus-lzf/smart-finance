@@ -176,6 +176,8 @@ try {
 
     const safeRedirect = await vite.ssrLoadModule("/src/lib/auth/safe-redirect.ts");
     assert.equal(safeRedirect.sanitizeInternalRedirect("/dados?pagina=2"), "/dados?pagina=2");
+    assert.equal(safeRedirect.sanitizeInternalRedirect("/"), "/dashboard");
+    assert.equal(safeRedirect.sanitizeInternalRedirect("/?utm_source=email"), "/dashboard");
     assert.equal(safeRedirect.sanitizeInternalRedirect("https://evil.example"), "/dashboard");
     assert.equal(safeRedirect.sanitizeInternalRedirect("//evil.example"), "/dashboard");
     assert.equal(safeRedirect.sanitizeInternalRedirect("/auth/callback?code=secret"), "/dashboard");
@@ -293,8 +295,15 @@ try {
       assert.equal(current.email, accounts[index].email, `server validates user ${index + 1}`);
     }
 
+    const authenticatedRoot = await clients[0].request("/");
+    assert.ok([302, 307].includes(authenticatedRoot.status));
+    assert.equal(
+      new URL(authenticatedRoot.headers.get("location"), APP_ORIGIN).pathname,
+      "/dashboard",
+      "authenticated root always redirects to the canonical dashboard",
+    );
+
     for (const url of [
-      "/",
       "/dashboard",
       "/dados",
       "/insights",

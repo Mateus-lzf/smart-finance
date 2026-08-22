@@ -1,5 +1,4 @@
 const ALLOWED_PATHS = new Set([
-  "/",
   "/cadastro",
   "/configuracoes",
   "/criar",

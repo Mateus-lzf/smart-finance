@@ -128,6 +128,8 @@ const vite = await createServer({ server: { middlewareMode: true }, appType: "cu
 try {
   const { sanitizeInternalRedirect } = await vite.ssrLoadModule("/src/lib/auth/safe-redirect.ts");
   assert.equal(sanitizeInternalRedirect("/dados?pagina=2"), "/dados?pagina=2");
+  assert.equal(sanitizeInternalRedirect("/"), "/dashboard");
+  assert.equal(sanitizeInternalRedirect("/?utm_source=email"), "/dashboard");
   assert.equal(sanitizeInternalRedirect("https://evil.example"), "/dashboard");
   assert.equal(sanitizeInternalRedirect("//evil.example"), "/dashboard");
 } finally {
