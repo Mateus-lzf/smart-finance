@@ -102,7 +102,11 @@ assert.ok(serverSource.includes("Disallow: /\\n"));
 
 const browserClientSource = await readFile("src/lib/supabase/browser-client.ts", "utf8");
 const serverClientSource = await readFile("src/lib/supabase/server-client.ts", "utf8");
+const callbackRouteSource = await readFile("src/routes/auth/callback.tsx", "utf8");
 assert.match(browserClientSource, /readPublicSupabaseEnv\(\)/);
 assert.match(serverClientSource, /readPublicSupabaseEnv\(process\.env\)/);
+assert.match(browserClientSource, /appendPkceFlowIdToRedirects:\s*true/);
+assert.match(serverClientSource, /appendPkceFlowIdToRedirects:\s*true/);
+assert.match(callbackRouteSource, /sb_flow_id/);
 
 console.log("Cloudflare staging config, guards, log redaction and indexing checks passed locally.");

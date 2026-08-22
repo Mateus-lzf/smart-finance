@@ -10,6 +10,9 @@ export const createSupabaseServerClient = createServerOnlyFn((): SupabaseClient<
   // Cloudflare runtime configuration separate from Vite's browser-time env.
   const env = readPublicSupabaseEnv(process.env);
   return createServerClient<Database>(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      experimental: { appendPkceFlowIdToRedirects: true },
+    },
     cookies: {
       getAll: () => Object.entries(getCookies()).map(([name, value]) => ({ name, value })),
       setAll: (cookies) => {

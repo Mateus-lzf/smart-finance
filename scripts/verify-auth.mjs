@@ -235,6 +235,11 @@ try {
         );
       }
       const callbackUrl = await consumeAuthEmail(local.MAILPIT_URL, account.email, "signup");
+      assert.match(
+        new URL(callbackUrl, APP_ORIGIN).searchParams.get("sb_flow_id") ?? "",
+        /^[A-Za-z0-9_-]{8,64}$/,
+        "signup callback carries the PKCE flow identifier",
+      );
       const callbackResponse = await clients[index].request(callbackUrl);
       assert.ok(
         [302, 307].includes(callbackResponse.status),
@@ -414,6 +419,11 @@ try {
       local.MAILPIT_URL,
       accounts[1].email,
       "recovery",
+    );
+    assert.match(
+      new URL(recoveryCallbackUrl, APP_ORIGIN).searchParams.get("sb_flow_id") ?? "",
+      /^[A-Za-z0-9_-]{8,64}$/,
+      "recovery callback carries the PKCE flow identifier",
     );
     const recoveryCallback = await recoveryClient.request(recoveryCallbackUrl);
     assert.ok(

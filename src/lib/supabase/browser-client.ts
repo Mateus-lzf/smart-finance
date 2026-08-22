@@ -11,6 +11,11 @@ export function getSupabaseBrowserClient(): SupabaseClient<Database> {
     browserClient = createBrowserClient<Database>(
       env.VITE_SUPABASE_URL,
       env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      {
+        auth: {
+          experimental: { appendPkceFlowIdToRedirects: true },
+        },
+      },
     );
   }
   return browserClient;
