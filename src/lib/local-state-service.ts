@@ -1,17 +1,11 @@
-import type { ImportProfile, Project, Transaction } from "./finance-types";
+import type { FinancialWorkspace } from "./financial-repository";
+import type { Transaction } from "./finance-types";
 
 export const LOCAL_STATE_KEY = "smart-finance.local-state.v2";
 export const LEGACY_LOCAL_STATE_KEYS = ["clareza.local-state.v2"] as const;
 const USER_LOCAL_STATE_KEY_PREFIX = `${LOCAL_STATE_KEY}.user`;
 
-export type LocalState = {
-  projects: Project[];
-  activeProjectId: string | null;
-  transactionsByProject: Record<string, Transaction[]>;
-  importProfilesByProject: Record<string, ImportProfile>;
-  visibleColumnsByProject: Record<string, string[]>;
-  analyticDimensionsByProject: Record<string, string[]>;
-};
+export type LocalState = FinancialWorkspace;
 
 export function parseLocalState(raw: string): LocalState {
   const parsed = JSON.parse(raw) as Partial<LocalState>;

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, FileSpreadsheet, FolderKanban, Pencil, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
@@ -22,6 +22,7 @@ import { kpisFromTransactions } from "@/lib/finance-service";
 import { productTitle } from "@/lib/product-config";
 import type { Project } from "@/lib/finance-types";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/projetos")({
   head: () => ({ meta: [{ title: productTitle("Seus projetos financeiros") }] }),
@@ -32,6 +33,7 @@ type FormState = { name: string; type: string; description: string };
 const emptyForm: FormState = { name: "", type: "", description: "" };
 
 function ProjetosPage() {
+  const navigate = useNavigate();
   const {
     projects,
     projectId,
@@ -44,6 +46,7 @@ function ProjetosPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
   const openCreate = () => {
     setEditing(null);
@@ -61,11 +64,18 @@ function ProjetosPage() {
     setDialogOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.name.trim()) return;
-    if (editing) updateProject(editing.id, form);
-    else createProject(form);
-    setDialogOpen(false);
+    setSaving(true);
+    try {
+      if (editing) await updateProject(editing.id, form);
+      else await createProject(form);
+      setDialogOpen(false);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não foi possível salvar o projeto.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -138,7 +148,13 @@ function ProjetosPage() {
                             `Excluir o projeto “${project.name}” e todos os seus lançamentos?`,
                           )
                         )
-                          deleteProject(project.id);
+                          void deleteProject(project.id).catch((cause) =>
+                            toast.error(
+                              cause instanceof Error
+                                ? cause.message
+                                : "Não foi possível excluir o projeto.",
+                            ),
+                          );
                       }}
                     >
                       <Trash2 className="size-3.5" />
@@ -173,12 +189,19 @@ function ProjetosPage() {
                   size="sm"
                   variant={active ? "outline" : "default"}
                   className="mt-5 gap-1.5"
-                  asChild
-                  onClick={() => setProjectId(project.id)}
+                  onClick={() => {
+                    void setProjectId(project.id)
+                      .then(() => navigate({ to: "/dashboard" }))
+                      .catch((cause) =>
+                        toast.error(
+                          cause instanceof Error
+                            ? cause.message
+                            : "Não foi possível selecionar o projeto.",
+                        ),
+                      );
+                  }}
                 >
-                  <Link to="/dashboard">
-                    Abrir dashboard <ArrowRight className="size-3.5" />
-                  </Link>
+                  Abrir dashboard <ArrowRight className="size-3.5" />
                 </Button>
               </motion.article>
             );
@@ -231,11 +254,11 @@ function ProjetosPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button disabled={!form.name.trim()} onClick={save}>
-              {editing ? "Salvar alterações" : "Criar projeto"}
+            <Button disabled={!form.name.trim() || saving} onClick={() => void save()}>
+              {saving ? "Salvando..." : editing ? "Salvar alterações" : "Criar projeto"}
             </Button>
           </DialogFooter>
         </DialogContent>

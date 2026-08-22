@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/lib/app-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/criar")({
   head: () => ({ meta: [{ title: productTitle("Criar projeto") }] }),
@@ -19,11 +20,19 @@ function CreateProjectPage() {
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     if (!name.trim()) return;
-    createProject({ name, type, description });
-    await navigate({ to: "/dashboard" });
+    setSaving(true);
+    try {
+      await createProject({ name, type, description });
+      await navigate({ to: "/dashboard" });
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Não foi possível criar o projeto.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -71,8 +80,8 @@ function CreateProjectPage() {
               placeholder="Uma breve descrição do projeto"
             />
           </div>
-          <Button type="submit" disabled={!name.trim()} className="w-full">
-            Criar projeto
+          <Button type="submit" disabled={!name.trim() || saving} className="w-full">
+            {saving ? "Criando..." : "Criar projeto"}
           </Button>
         </form>
       </div>

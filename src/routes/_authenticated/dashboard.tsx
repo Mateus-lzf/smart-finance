@@ -87,11 +87,11 @@ function Dashboard() {
           open={createOpen}
           transaction={null}
           onOpenChange={setCreateOpen}
-          onCreate={(transaction) => {
-            addTransaction(transaction);
+          onCreate={async (transaction) => {
+            await addTransaction(transaction);
             toast.success("Lançamento criado.");
           }}
-          onUpdate={() => undefined}
+          onUpdate={async () => undefined}
         />
       </AppShell>
     );

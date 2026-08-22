@@ -29,7 +29,7 @@ function EditableCell({
 }: {
   value: string;
   editValue?: string;
-  onChange: (v: string) => boolean;
+  onChange: (v: string) => Promise<boolean>;
   align?: "left" | "right";
 }) {
   const [editing, setEditing] = useState(false);
@@ -45,7 +45,9 @@ function EditableCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           setEditing(false);
-          if (!onChange(draft)) setDraft(editValue ?? value);
+          void onChange(draft).then((saved) => {
+            if (!saved) setDraft(editValue ?? value);
+          });
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -104,7 +106,7 @@ export function DataTable() {
     [rows, query, filters],
   );
 
-  const patch = (id: string, key: "description" | "category" | "amount", value: string) => {
+  const patch = async (id: string, key: "description" | "category" | "amount", value: string) => {
     const normalized = key === "amount" ? parseTransactionAmount(value) : value.trim();
     if (normalized === null || normalized === "") {
       toast.error(
@@ -113,7 +115,7 @@ export function DataTable() {
       return false;
     }
     try {
-      updateTransaction(id, { [key]: normalized });
+      await updateTransaction(id, { [key]: normalized });
       return true;
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : "Não foi possível salvar a alteração.");
@@ -149,7 +151,9 @@ export function DataTable() {
     const next = checked
       ? [...visibleColumns, id]
       : visibleColumns.filter((column) => column !== id);
-    setVisibleColumns(next);
+    void setVisibleColumns(next).catch((cause) => {
+      toast.error(cause instanceof Error ? cause.message : "Não foi possível salvar as colunas.");
+    });
   };
 
   return (
@@ -328,17 +332,16 @@ export function DataTable() {
                         title="Excluir lançamento"
                         aria-label={`Excluir ${r.description}`}
                         onClick={() => {
-                          if (!window.confirm(`Excluir o lançamento “${r.description}”?`)) return;
-                          try {
-                            deleteTransaction(r.id);
-                            toast.success("Lançamento excluído.");
-                          } catch (cause) {
-                            toast.error(
-                              cause instanceof Error
-                                ? cause.message
-                                : "Não foi possível excluir o lançamento.",
+                          if (!window.confirm(`Excluir o lançamento "${r.description}"?`)) return;
+                          void deleteTransaction(r.id)
+                            .then(() => toast.success("Lançamento excluído."))
+                            .catch((cause) =>
+                              toast.error(
+                                cause instanceof Error
+                                  ? cause.message
+                                  : "Não foi possível excluir o lançamento.",
+                              ),
                             );
-                          }
                         }}
                       >
                         <Trash2 className="size-3.5" />
@@ -371,12 +374,12 @@ export function DataTable() {
         open={dialogOpen}
         transaction={editingTransaction}
         onOpenChange={setDialogOpen}
-        onCreate={(transaction) => {
-          addTransaction(transaction);
+        onCreate={async (transaction) => {
+          await addTransaction(transaction);
           toast.success("Lançamento criado.");
         }}
-        onUpdate={(id, patchValue) => {
-          updateTransaction(id, patchValue);
+        onUpdate={async (id, patchValue) => {
+          await updateTransaction(id, patchValue);
           toast.success("Lançamento alterado.");
         }}
       />

@@ -15,6 +15,7 @@ import {
 import { productTitle } from "@/lib/product-config";
 import { analyzeInsights } from "@/lib/insight-service";
 import { useApp } from "@/lib/app-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/insights")({
   head: () => ({ meta: [{ title: productTitle("Insights financeiros") }] }),
@@ -43,10 +44,12 @@ function InsightsPage() {
   });
   const toggleDimension = (id: string, checked: boolean) => {
     if (checked && selectedDimensions.length >= 3) return;
-    setAnalyticDimensions(
+    void setAnalyticDimensions(
       checked
         ? [...selectedDimensions, id]
         : selectedDimensions.filter((columnId) => columnId !== id),
+    ).catch((cause) =>
+      toast.error(cause instanceof Error ? cause.message : "Não foi possível salvar as dimensões."),
     );
   };
 

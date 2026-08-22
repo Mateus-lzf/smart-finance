@@ -99,14 +99,21 @@ try {
     "legacy data remains available for a future explicit migration",
   );
 
-  const [routeSource, appStoreSource, technicalSource] = await Promise.all([
+  const [routeSource, appStoreSource, localRepositorySource, technicalSource] = await Promise.all([
     readFile("src/routes/_authenticated.tsx", "utf8"),
     readFile("src/lib/app-store.tsx", "utf8"),
+    readFile("src/lib/local-financial-repository.ts", "utf8"),
     readFile("src/lib/auth/technical-project-functions.ts", "utf8"),
   ]);
   assert.match(routeSource, /userId=\{user\.id\}/, "the validated auth user scopes AppProvider");
   assert.match(routeSource, /key=\{user\.id\}/, "account changes reset the financial provider");
-  assert.match(appStoreSource, /getUserLocalStateKey\(userId\)/);
+  assert.doesNotMatch(
+    appStoreSource,
+    /localStorage|getUserLocalStateKey|persistLocalState/,
+    "AppProvider depends on the repository instead of local persistence details",
+  );
+  assert.match(appStoreSource, /createLocalFinancialRepository\(userId\)/);
+  assert.match(localRepositorySource, /getUserLocalStateKey\(userId\)/);
   assert.doesNotMatch(
     appStoreSource,
     /technical-project-functions|\.from\(["'](?:projects|transactions)["']\)/,

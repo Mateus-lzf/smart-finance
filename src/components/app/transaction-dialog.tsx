@@ -53,12 +53,13 @@ export function TransactionDialog({
   open: boolean;
   transaction: Transaction | null;
   onOpenChange: (open: boolean) => void;
-  onCreate: (transaction: Transaction) => void;
-  onUpdate: (id: string, patch: Partial<Transaction>) => void;
+  onCreate: (transaction: Transaction) => Promise<void>;
+  onUpdate: (id: string, patch: Partial<Transaction>) => Promise<void>;
 }) {
   const [input, setInput] = useState<TransactionInput>(emptyInput);
   const [errors, setErrors] = useState<TransactionValidationErrors>({});
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -72,8 +73,9 @@ export function TransactionDialog({
     setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
-  const save = () => {
+  const save = async () => {
     setSaveError(null);
+    setSaving(true);
     try {
       if (transaction) {
         const result = editableTransactionPatch(input);
@@ -81,20 +83,22 @@ export function TransactionDialog({
           setErrors(result.errors);
           return;
         }
-        onUpdate(transaction.id, result.value);
+        await onUpdate(transaction.id, result.value);
       } else {
         const result = createManualTransaction(input);
         if (!result.ok) {
           setErrors(result.errors);
           return;
         }
-        onCreate(result.value);
+        await onCreate(result.value);
       }
       onOpenChange(false);
     } catch (cause) {
       setSaveError(
         cause instanceof Error ? cause.message : "Não foi possível salvar o lançamento.",
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -178,10 +182,12 @@ export function TransactionDialog({
           </p>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={save}>{transaction ? "Salvar alterações" : "Salvar lançamento"}</Button>
+          <Button onClick={() => void save()} disabled={saving}>
+            {saving ? "Salvando..." : transaction ? "Salvar alterações" : "Salvar lançamento"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

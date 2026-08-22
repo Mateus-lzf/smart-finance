@@ -81,10 +81,11 @@ export function DataUpdateDialog() {
     }
   };
 
-  const applyUpdate = () => {
+  const applyUpdate = async () => {
     if (!comparison || !preview || !mapping || !project) return;
+    setLoading(true);
     try {
-      commitImportedTransactions(
+      await commitImportedTransactions(
         comparison.nextTransactions,
         { headers: preview.headers, columns: preview.columns, mapping },
         { mode: "replace-project", targetProjectId: project.id },
@@ -93,6 +94,8 @@ export function DataUpdateDialog() {
       reset();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível salvar a atualização.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -313,7 +316,9 @@ export function DataUpdateDialog() {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={applyUpdate}>Confirmar atualização</Button>
+                <Button onClick={() => void applyUpdate()} disabled={loading}>
+                  {loading ? "Atualizando..." : "Confirmar atualização"}
+                </Button>
               </DialogFooter>
             </div>
           )}

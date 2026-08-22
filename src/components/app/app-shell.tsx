@@ -128,7 +128,17 @@ function ProjectSwitcher({ collapsed }: { collapsed: boolean }) {
           Seus projetos
         </DropdownMenuLabel>
         {projects.map((p) => (
-          <DropdownMenuItem key={p.id} onSelect={() => setProjectId(p.id)} className="gap-2">
+          <DropdownMenuItem
+            key={p.id}
+            onSelect={() => {
+              void setProjectId(p.id).catch((cause) =>
+                toast.error(
+                  cause instanceof Error ? cause.message : "Não foi possível selecionar o projeto.",
+                ),
+              );
+            }}
+            className="gap-2"
+          >
             <FolderKanban className="size-3.5" />
             <span className="flex-1 truncate">{p.name}</span>
             {p.id === project.id && <Check className="size-3.5 text-primary" />}

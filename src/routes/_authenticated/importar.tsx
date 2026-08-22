@@ -78,7 +78,7 @@ function ImportPage() {
       setMapping(null);
       setStep(2);
       setStep(3);
-      commitImportedTransactions(
+      await commitImportedTransactions(
         rows,
         { headers: parsed.headers, columns: parsed.columns, mapping: selectedMapping },
         { mode: "create-project", newProjectName },
