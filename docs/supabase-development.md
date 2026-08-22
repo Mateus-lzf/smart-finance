@@ -86,9 +86,10 @@ The server client is created per request with the publishable key and the authen
 cookies. It does not bypass RLS. `owner_user_id` is derived from the validated server session and is
 not accepted as authority from client input.
 
-The browser client exists as the SSR-compatible session client but is not connected to the current
-product UI in 14B1. Route protection and authentication screens belong to 14B2. Repositories, remote
-financial persistence, feature flags, and local-data migration remain future work.
+The browser client is the SSR-compatible user-session client. Sprint 14B2 completed the Auth UI,
+server-aware route protection, PKCE callbacks, password recovery and logout. It remains separate
+from the financial AppStore. Repositories, remote financial persistence and assisted local-data
+migration remain future work.
 
 Existing financial data is not uploaded, associated with an account, copied, renamed, or removed.
 Authentication and financial application state intentionally remain separate.
@@ -108,7 +109,7 @@ and never put production values in either file.
 npm run db:start
 npm run dev
 
-# future remote staging, only after Checkpoint 15B links the approved project
+# opt-in development against the existing staging project
 npm run dev:staging
 ```
 
@@ -157,21 +158,27 @@ npm run test:staging:guard
 
 ## Opt-in remote smoke test
 
-`npm run test:staging` is prepared for Checkpoint 15C but must not be run during 15A. It requires:
+`npm run test:staging` is the opt-in remote RLS verification delivered in Sprint 15. It requires:
 
 - a validated staging link and configuration;
 - `.env.staging.test.local` copied from `.env.staging.test.example`;
 - the explicit remote-test confirmation value;
 - two distinct, confirmed, disposable staging-only users.
 
-It authenticates both users with the publishable key, proves anonymous rejection and cross-user RLS,
-creates one clearly named technical project, and removes that fixture in `finally`. It neither
-imports nor reads local financial data. This network-dependent test is intentionally excluded from
-`npm test` and `db:verify`.
+It authenticates both users with the publishable key, proves anonymous rejection, and creates one
+temporary project per owner. In both A-to-B and B-to-A directions it proves that cross-user select,
+update and delete affect zero rows and that forged `owner_user_id` values are rejected. Each owner
+then removes exactly its own fixture in `finally`, and both sign-outs are attempted even if cleanup
+fails. It neither imports nor reads local financial data. This network-dependent test is
+intentionally excluded from `npm test` and `db:verify`.
+
+The symmetric remote matrix passed during Sprint 15 closure and removed both technical fixtures.
+That historical result does not remove the explicit opt-in requirement for future executions.
 
 ## Remote operations lifecycle
 
-Checkpoint 15A must end with no remote link. In 15B, after separate approval, the operator will:
+Sprint 15 created and linked the dedicated staging project through the guarded 15B workflow. For a
+new staging project or a future migration change, the operator must still:
 
 1. create the dedicated staging project manually in the controlled Supabase organization;
 2. copy only its ref, URL, and publishable key into ignored local files;
@@ -181,5 +188,24 @@ Checkpoint 15A must end with no remote link. In 15B, after separate approval, th
 6. obtain approval before running the doubly confirmed staging push;
 7. remove the local link after the checkpoint when it is no longer needed.
 
-Production will use another Supabase project, another application deployment, and another approval
+Production will use another Supabase project, another application deployment and another approval
 workflow. Staging files and scripts must never be repurposed for production.
+
+## Sprint 15 closure and next boundary
+
+Sprint 15 is **CLOSED**. Cloudflare Access is consciously deferred and documented; Cloudflare Access
+is not complete.
+Manual staging validation covered signup confirmation, PKCE redirect to `/dashboard`, authenticated
+session and refresh, logout, anonymous private-route rejection, canonical empty Dashboard and the
+complete password recovery/reset/login journey. The remote symmetric RLS test passed separately.
+
+Cloudflare Access was not configured because the Zero Trust Free onboarding required a billing
+method and no card was registered. This is not an application failure, but Access or an equivalent
+protection must be reconsidered before commercial/production exposure or broader staging access.
+
+The next product boundary is remote financial persistence. It requires a repository layer,
+ownership derived from the validated session, assisted and reversible migration of local data,
+atomic remote imports and explicit protection against duplicates. Production separation, domain,
+SMTP, rate limiting, observability, backup/recovery, account export/deletion, LGPD operations,
+secret rotation and rollback remain additional commercial work. None of these capabilities was
+implemented by Sprint 15.

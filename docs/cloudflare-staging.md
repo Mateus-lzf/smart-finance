@@ -1,8 +1,9 @@
 # Cloudflare Workers staging runbook
 
 The Smart Finance staging application uses Cloudflare Workers with Static Assets. Checkpoint 15D-A
-prepares the repository and performs only a local Wrangler dry-run. It does not log in, deploy,
-create a Worker, configure Access, or modify Supabase.
+prepared the repository and Checkpoint 15D-B deployed and validated the staging Worker. **Sprint 15
+is CLOSED. Cloudflare Access is consciously deferred and documented; Cloudflare Access is not
+complete.** This runbook remains the source of truth for safe staging builds and future redeploys.
 
 ## Runtime contract
 
@@ -36,10 +37,10 @@ the exact equality of the Vite and Worker public Supabase settings, Nitro artifa
 Wrangler with `deploy --dry-run`. It writes only local output under `.wrangler/staging-dry-run` and
 neither authenticates nor uploads anything.
 
-## Future remote identity check
+## Remote identity check
 
-Checkpoint 15D-B will copy `.env.cloudflare.staging.example` to the ignored
-`.env.cloudflare.staging.local` and provide the approved account ID. Only then may the operator run:
+The ignored `.env.cloudflare.staging.local` provides the approved account ID. Before a future
+redeploy, the operator may run:
 
 ```sh
 npm run cloudflare:staging:check
@@ -49,7 +50,7 @@ That command calls `wrangler whoami` and refuses an authenticated account that d
 exact approved account ID. The env file rejects tokens, API keys, secrets, passwords, database URLs,
 and service-role variables.
 
-## Future deploy guard
+## Redeploy guard
 
 There is deliberately no generic deploy script. A staging deploy requires:
 
@@ -63,19 +64,46 @@ There is deliberately no generic deploy script. A staging deploy requires:
 - a second account check immediately before upload.
 
 Never store the one-time deployment confirmation in an env file. Wrangler login and deploy require
-separate approval in Checkpoint 15D-B.
+separate explicit approval. A successful previous deployment never authorizes another upload.
+
+## Validated staging behavior
+
+The following evidence closed the application-runtime portion of Checkpoint 15D-B:
+
+- **Code/static evidence:** Nitro Worker and assets configuration, per-request Supabase environment,
+  publishable-key-only clients, server-aware private routes, log redaction and anti-indexing headers.
+- **Remote automated test:** the symmetric A/B Auth/RLS matrix rejected anonymous access,
+  cross-user reads, updates, deletes and forged ownership, then removed both owner fixtures.
+- **Manual staging validation:** signup with the first valid confirmation link, PKCE redirect to
+  `/dashboard`, authenticated session, refresh, logout, anonymous-route rejection, canonical
+  post-login navigation and password recovery/reset/login passed over HTTPS.
+
+The financial UI still uses per-user localStorage. The deployed Worker does not read, migrate or
+dual-write product projects and transactions to Supabase.
 
 ## Security before first deploy
 
 - Staging responses receive `X-Robots-Tag: noindex, nofollow, noarchive`.
 - `/robots.txt` disallows every crawler only when the Worker runtime environment is staging.
 - Error logging redacts authorization values, cookies, auth/reset codes, JWTs and email addresses.
-- Cloudflare Access remains a manual 15D-B action and is the actual access-control boundary;
-  crawler directives are defense in depth only.
+- Cloudflare Access was consciously deferred because creating the Zero Trust Free organization
+  required a billing method and no card was registered at this stage.
+- No Access policy and no related Worker change were made. Access or an equivalent edge protection
+  must be reconsidered before commercial/production exposure or wider staging access.
+- Crawler directives are defense in depth only and must never be described as access control.
 - Logs must never include request bodies, passwords, cookies, full callback URLs, or financial data.
 
-## Rollback boundary
+## Rollback boundary after deployment
 
-Before the first deploy there is nothing remote to roll back. If build, size, startup, compatibility,
-or secret auditing fails, stop in 15D-A. Do not authenticate or create the Worker to work around a
-local validation failure.
+If build, size, startup, compatibility or secret auditing fails, stop before redeploying. Do not
+alter Supabase, disable RLS or add privileged credentials to work around a Worker failure. A remote
+rollback must use an explicitly reviewed previously working application revision or disable access
+to the staging Worker through an approved Cloudflare operation; the exact deployment/version ID is
+external state and is not recorded in Git. Production requires its own documented rollback process.
+
+## Commercial gaps after Sprint 15
+
+This staging deployment is not a production launch. Remote financial persistence, assisted local
+data migration, atomic remote imports, production environments, domain, SMTP, rate limiting,
+observability, backups, account export/deletion, LGPD operations, secret rotation and production
+rollback remain future work.

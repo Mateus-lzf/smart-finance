@@ -1,7 +1,25 @@
 # Supabase staging runbook
 
-This runbook prepares the Smart Finance staging environment without making it a financial data
-source. Checkpoint 15A contains no remote project, login, link, push, or deployment.
+This runbook records the staging environment delivered by Sprint 15 without making it a financial
+data source. **Sprint 15 is CLOSED. Cloudflare Access is consciously deferred and documented;
+Cloudflare Access is not complete.** Projects and transactions displayed by the product still come
+exclusively from the per-user local AppStore/localStorage state.
+
+## Sprint 15 closure status
+
+The checkpoints below are complete. Evidence is deliberately classified by origin:
+
+- **Code/static evidence:** environment guards, publishable-key-only clients, server-side session
+  validation, RLS policies, local state isolation and Cloudflare runtime configuration.
+- **Remote automated test:** `npm run test:staging` passed the symmetric A/B RLS matrix. Anonymous
+  access and cross-user reads, updates, deletes and forged ownership were rejected. Both temporary
+  fixtures were removed by their respective owners.
+- **Manual staging validation:** signup with a new account, receipt and use of the first valid
+  confirmation email, PKCE callback to `/dashboard`, authenticated session, refresh, logout,
+  anonymous private-route protection, canonical post-login navigation and the complete password
+  recovery/reset/login journey all passed.
+
+No service-role, admin or database credential is part of the application runtime.
 
 ## Ownership and environment decisions
 
@@ -10,7 +28,7 @@ source. Checkpoint 15A contains no remote project, login, link, push, or deploym
 - Start on Supabase Free while staging is restricted to the owner.
 - Select the region deliberately at project creation time.
 - Use a sandbox SMTP provider before inviting external evaluators.
-- The future Cloudflare staging deployment will initially use its provider URL.
+- The Cloudflare staging deployment uses its provider URL; no permanent domain is configured.
 - Production will be a separate project and is not configured by this runbook.
 
 ## Files and credential classes
@@ -30,14 +48,14 @@ signing material are forbidden in application env files and Git.
 
 ## Checkpoint boundaries
 
-### 15A — local preparation
+### 15A - local preparation — complete
 
 - Validate all local suites.
 - Validate the staging guard offline.
 - Confirm `supabase/.temp/project-ref` is absent.
 - Confirm no remote command or deployment occurred.
 
-### 15B — remote schema, separately approved
+### 15B - remote schema — complete
 
 - Create and configure the staging project manually.
 - Link only after displaying and confirming its exact project ref.
@@ -45,20 +63,55 @@ signing material are forbidden in application env files and Git.
 - Apply only committed migrations through `db:staging:push`.
 - Validate schema, constraints, RLS and migration history.
 
-### 15C — remote Auth/RLS, separately approved
+### 15C - remote Auth/RLS — complete
 
 - Configure exact Auth callback URLs.
 - Use two disposable confirmed staging accounts.
-- Run the opt-in remote test.
+- Run the opt-in remote test with the symmetric A/B matrix.
 - Validate the application Server Function boundary and sanitized failure states.
 
-### 15D - Cloudflare staging, separately approved
+The remote test passed and removed both technical fixtures. It remains opt-in and must never be run
+against production.
+
+### 15D - Cloudflare staging — complete
 
 - Follow `docs/cloudflare-staging.md` as the deployment runbook.
 - Create a distinct staging deployment and bindings.
 - Allow only exact HTTPS callback URLs.
 - Validate cookies, PKCE, refresh, recovery and logout in the deployed runtime.
 - Confirm the financial localStorage value is unchanged before and after the journey.
+
+The deployed runtime passed signup confirmation, PKCE callback, session refresh, logout, anonymous
+route protection and password recovery/reset manual checks. The financial UI remained local and was
+not connected or dual-written to PostgreSQL.
+
+## Cloudflare Access decision
+
+Cloudflare Access is **deferred**, not complete. Creating the Zero Trust Free organization required
+a billing method, and the project owner consciously chose not to register a card during this stage.
+No Access policy and no related Worker change were made.
+
+This is not a functional failure of Smart Finance and does not reopen Sprint 15. It must be
+reconsidered before commercial/production exposure or broader staging access. `X-Robots-Tag` and
+`robots.txt` reduce accidental indexing but are not access control.
+
+## Work after Sprint 15
+
+The following commercial capabilities remain intentionally outside Sprint 15:
+
+- repository layer and remote financial persistence;
+- assisted migration of per-user and legacy local data;
+- atomic remote CSV/XLSX import and update;
+- separate production Supabase and Cloudflare environments;
+- permanent domain and transactional SMTP;
+- rate limiting, production observability and alerting;
+- tested backup, recovery and operational rollback;
+- account data export and deletion, privacy and LGPD procedures;
+- production secret management and rotation;
+- an appropriate staging/production edge-access strategy.
+
+Do not treat the existing technical `projects` table or remote RLS smoke fixtures as the product's
+financial source of truth.
 
 ## Rollback rules
 
