@@ -36,36 +36,106 @@ for (let index = 0; index < clients.length; index += 1) {
 }
 assert.notEqual(users[0].id, users[1].id, "RLS test users are distinct");
 
-const projectName = `staging-smoke-${Date.now()}`;
-const created = await clients[0]
-  .from("projects")
-  .insert({ owner_user_id: users[0].id, name: projectName })
-  .select("id,owner_user_id")
-  .single();
-assert.ifError(created.error);
-assert.ok(created.data, "user A creates a disposable staging project");
-
-try {
-  const invisibleToB = await clients[1].from("projects").select("id").eq("id", created.data.id);
-  assert.ifError(invisibleToB.error);
-  assert.equal(invisibleToB.data.length, 0, "user B cannot read user A project");
-
-  const forgedOwner = await clients[1]
+async function createFixture(client, ownerUserId, suffix) {
+  const created = await client
     .from("projects")
-    .insert({ owner_user_id: users[0].id, name: "forged-owner" });
-  assert.ok(forgedOwner.error, "user B cannot trust or forge owner_user_id");
-
-  const updateByB = await clients[1]
-    .from("projects")
-    .update({ name: "cross-user-update" })
-    .eq("id", created.data.id)
-    .select("id");
-  assert.ifError(updateByB.error);
-  assert.equal(updateByB.data.length, 0, "user B cannot update user A project");
-} finally {
-  const cleanup = await clients[0].from("projects").delete().eq("id", created.data.id);
-  assert.ifError(cleanup.error);
-  await Promise.all(clients.map((supabase) => supabase.auth.signOut()));
+    .insert({ owner_user_id: ownerUserId, name: `staging-smoke-${Date.now()}-${suffix}` })
+    .select("id,owner_user_id")
+    .single();
+  assert.ifError(created.error);
+  assert.ok(created.data, `user ${suffix} creates a disposable staging project`);
+  return created.data;
 }
 
-console.log("Opt-in remote staging Auth/RLS smoke test passed and removed its technical fixture.");
+async function assertCannotAccess(attacker, fixture, attackerLabel, ownerLabel) {
+  const readAttempt = await attacker.from("projects").select("id").eq("id", fixture.id);
+  assert.ifError(readAttempt.error);
+  assert.equal(
+    readAttempt.data.length,
+    0,
+    `user ${attackerLabel} cannot read user ${ownerLabel} project`,
+  );
+
+  const updateAttempt = await attacker
+    .from("projects")
+    .update({ name: `cross-user-update-${attackerLabel}` })
+    .eq("id", fixture.id)
+    .select("id");
+  assert.ifError(updateAttempt.error);
+  assert.equal(
+    updateAttempt.data.length,
+    0,
+    `user ${attackerLabel} cannot update user ${ownerLabel} project`,
+  );
+
+  const deleteAttempt = await attacker.from("projects").delete().eq("id", fixture.id).select("id");
+  assert.ifError(deleteAttempt.error);
+  assert.equal(
+    deleteAttempt.data.length,
+    0,
+    `user ${attackerLabel} cannot delete user ${ownerLabel} project`,
+  );
+}
+
+let fixtureA;
+let fixtureB;
+
+try {
+  fixtureA = await createFixture(clients[0], users[0].id, "A");
+  fixtureB = await createFixture(clients[1], users[1].id, "B");
+
+  await assertCannotAccess(clients[1], fixtureA, "B", "A");
+  await assertCannotAccess(clients[0], fixtureB, "A", "B");
+
+  const forgedOwnerByA = await clients[0]
+    .from("projects")
+    .insert({ owner_user_id: users[1].id, name: "forged-owner-by-a" });
+  assert.ok(forgedOwnerByA.error, "user A cannot forge user B owner_user_id");
+
+  const forgedOwnerByB = await clients[1]
+    .from("projects")
+    .insert({ owner_user_id: users[0].id, name: "forged-owner-by-b" });
+  assert.ok(forgedOwnerByB.error, "user B cannot forge user A owner_user_id");
+} finally {
+  const cleanupTasks = [
+    fixtureA
+      ? clients[0].from("projects").delete().eq("id", fixtureA.id).select("id")
+      : Promise.resolve(null),
+    fixtureB
+      ? clients[1].from("projects").delete().eq("id", fixtureB.id).select("id")
+      : Promise.resolve(null),
+  ];
+  const cleanupResults = await Promise.allSettled(cleanupTasks);
+  const signOutResults = await Promise.allSettled(
+    clients.map((supabase) => supabase.auth.signOut()),
+  );
+  const cleanupErrors = [];
+
+  for (const [index, result] of cleanupResults.entries()) {
+    const fixture = index === 0 ? fixtureA : fixtureB;
+    if (!fixture) continue;
+    if (result.status === "rejected") {
+      cleanupErrors.push(new Error(`user ${index === 0 ? "A" : "B"} cleanup request failed`));
+      continue;
+    }
+    if (result.value.error) {
+      cleanupErrors.push(new Error(`user ${index === 0 ? "A" : "B"} cleanup was rejected`));
+    } else if (result.value.data.length !== 1) {
+      cleanupErrors.push(
+        new Error(`user ${index === 0 ? "A" : "B"} cleanup did not remove exactly one fixture`),
+      );
+    }
+  }
+
+  for (const [index, result] of signOutResults.entries()) {
+    if (result.status === "rejected" || result.value.error) {
+      cleanupErrors.push(new Error(`user ${index === 0 ? "A" : "B"} sign-out failed`));
+    }
+  }
+
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(cleanupErrors, "Remote staging fixture cleanup or sign-out failed.");
+  }
+}
+
+console.log("Opt-in remote staging Auth/RLS matrix passed and removed both technical fixtures.");
