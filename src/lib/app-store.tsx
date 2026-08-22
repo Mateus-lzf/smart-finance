@@ -9,10 +9,9 @@ import {
 } from "react";
 import type { ImportProfile, Project, ProjectInput, Transaction } from "./finance-types";
 import {
-  LOCAL_STATE_KEY,
-  LEGACY_LOCAL_STATE_KEYS,
   deleteProjectFromLocalState,
-  parseLocalState,
+  getUserLocalStateKey,
+  loadUserLocalState,
   persistLocalState,
   replaceProjectTransactionsInLocalState,
   type LocalState,
@@ -59,7 +58,8 @@ type AppState = {
 const Ctx = createContext<AppState | null>(null);
 const DEFAULT_VISIBLE_COLUMNS = ["date", "description", "category", "type", "amount"];
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function AppProvider({ children, userId }: { children: ReactNode; userId: string }) {
+  const storageKey = useMemo(() => getUserLocalStateKey(userId), [userId]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectIdState] = useState<string | null>(null);
   const [transactionsByProject, setTransactionsByProject] = useState<Record<string, Transaction[]>>(
@@ -80,17 +80,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.removeItem("fin.state");
-      const legacyKey = LEGACY_LOCAL_STATE_KEYS.find((key) => localStorage.getItem(key));
-      const raw =
-        localStorage.getItem(LOCAL_STATE_KEY) ??
-        (legacyKey ? localStorage.getItem(legacyKey) : null);
-      if (raw) {
-        const state = parseLocalState(raw);
-        if (legacyKey) {
-          persistLocalState(localStorage, state);
-          localStorage.removeItem(legacyKey);
-        }
+      const state = loadUserLocalState(localStorage, userId);
+      if (state) {
         const storedProjects = state.projects;
         setProjects(storedProjects);
         setTransactionsByProject(state.transactionsByProject);
@@ -107,7 +98,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Invalid local data is ignored and the product starts empty.
     }
     setHydrated(true);
-  }, []);
+  }, [storageKey, userId]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -120,7 +111,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       analyticDimensionsByProject,
     };
     try {
-      persistLocalState(localStorage, state);
+      persistLocalState(localStorage, state, storageKey);
     } catch {
       // The current session keeps working if storage is unavailable or full.
     }
@@ -132,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     visibleColumnsByProject,
     analyticDimensionsByProject,
     hydrated,
+    storageKey,
   ]);
 
   const setProjectId = useCallback(
@@ -175,7 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         id,
       );
       try {
-        persistLocalState(localStorage, next);
+        persistLocalState(localStorage, next, storageKey);
       } catch {
         // React state remains authoritative when storage is unavailable.
       }
@@ -194,6 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importProfilesByProject,
       visibleColumnsByProject,
       analyticDimensionsByProject,
+      storageKey,
     ],
   );
 
@@ -253,7 +246,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         },
       };
       try {
-        persistLocalState(localStorage, next);
+        persistLocalState(localStorage, next, storageKey);
       } catch (cause) {
         const error = new Error(
           "Não há capacidade de armazenamento local suficiente. Os dados atuais foram mantidos intactos.",
@@ -276,6 +269,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importProfilesByProject,
       visibleColumnsByProject,
       analyticDimensionsByProject,
+      storageKey,
     ],
   );
 
@@ -292,7 +286,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       const next = replaceProjectTransactionsInLocalState(current, projectId, rows);
       try {
-        persistLocalState(localStorage, next);
+        persistLocalState(localStorage, next, storageKey);
       } catch (cause) {
         const error = new Error(
           "Não foi possível salvar no armazenamento local. A alteração não foi aplicada.",
@@ -310,6 +304,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       importProfilesByProject,
       visibleColumnsByProject,
       analyticDimensionsByProject,
+      storageKey,
     ],
   );
 

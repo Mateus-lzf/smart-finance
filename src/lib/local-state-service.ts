@@ -2,6 +2,7 @@ import type { ImportProfile, Project, Transaction } from "./finance-types";
 
 export const LOCAL_STATE_KEY = "smart-finance.local-state.v2";
 export const LEGACY_LOCAL_STATE_KEYS = ["clareza.local-state.v2"] as const;
+const USER_LOCAL_STATE_KEY_PREFIX = `${LOCAL_STATE_KEY}.user`;
 
 export type LocalState = {
   projects: Project[];
@@ -38,8 +39,26 @@ export function serializeLocalState(state: LocalState) {
   return JSON.stringify(state);
 }
 
-export function persistLocalState(storage: Pick<Storage, "setItem">, state: LocalState) {
-  storage.setItem(LOCAL_STATE_KEY, serializeLocalState(state));
+export function getUserLocalStateKey(userId: string) {
+  const normalized = userId.trim();
+  if (!normalized) throw new Error("A identidade do usuário é obrigatória.");
+  return `${USER_LOCAL_STATE_KEY_PREFIX}.${encodeURIComponent(normalized)}`;
+}
+
+export function loadUserLocalState(
+  storage: Pick<Storage, "getItem">,
+  userId: string,
+): LocalState | null {
+  const raw = storage.getItem(getUserLocalStateKey(userId));
+  return raw ? parseLocalState(raw) : null;
+}
+
+export function persistLocalState(
+  storage: Pick<Storage, "setItem">,
+  state: LocalState,
+  storageKey = LOCAL_STATE_KEY,
+) {
+  storage.setItem(storageKey, serializeLocalState(state));
 }
 
 export function replaceProjectTransactionsInLocalState(

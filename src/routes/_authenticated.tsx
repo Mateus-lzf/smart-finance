@@ -1,6 +1,6 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { AppProvider } from "@/lib/app-store";
-import { AuthProvider } from "@/lib/auth/auth-provider";
+import { AuthProvider, useAuth } from "@/lib/auth/auth-provider";
 import { getAuthState } from "@/lib/auth/auth-functions";
 import { sanitizeInternalRedirect } from "@/lib/auth/safe-redirect";
 
@@ -29,9 +29,16 @@ function AuthenticatedApplication() {
   const { user } = Route.useRouteContext();
   return (
     <AuthProvider initialUser={user}>
-      <AppProvider>
-        <Outlet />
-      </AppProvider>
+      <AuthenticatedFinancialState />
     </AuthProvider>
+  );
+}
+
+function AuthenticatedFinancialState() {
+  const { user } = useAuth();
+  return (
+    <AppProvider key={user.id} userId={user.id}>
+      <Outlet />
+    </AppProvider>
   );
 }

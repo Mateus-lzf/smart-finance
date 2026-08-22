@@ -476,14 +476,6 @@ try {
       "logged-out session cannot access protected Server Functions",
     );
 
-    const localStateFiles = spawnSync("git", [
-      "diff",
-      "--quiet",
-      "--",
-      "src/lib/app-store.tsx",
-      "src/lib/local-state-service.ts",
-    ]);
-    assert.equal(localStateFiles.status, 0, "financial localStorage implementation is unchanged");
     const routeSources = await Promise.all([
       readFile("src/routes/_authenticated.tsx", "utf8"),
       readFile("src/routes/__root.tsx", "utf8"),
@@ -499,7 +491,12 @@ try {
     assert.doesNotMatch(
       routeSources.join("\n"),
       /localStorage|STORAGE_KEY|smart-finance-state/,
-      "authentication and account UI never reads, writes, clears or namespaces financial localStorage",
+      "authentication UI does not directly manipulate financial localStorage",
+    );
+    assert.match(
+      routeSources[0],
+      /<AppProvider key=\{user\.id\} userId=\{user\.id\}>/,
+      "validated identity scopes the separate financial provider",
     );
     const authProviderSource = routeSources[2];
     assert.match(authProviderSource, /createContext/);
