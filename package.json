@@ -9,11 +9,15 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "build:staging": "node scripts/supabase-staging.mjs check && vite build --mode staging",
+    "cloudflare:staging:check": "node scripts/cloudflare-staging.mjs check",
+    "cloudflare:staging:plan": "node scripts/cloudflare-staging.mjs plan",
+    "cloudflare:staging:deploy": "node scripts/cloudflare-staging.mjs deploy",
     "preview": "vite preview",
     "test:import": "node scripts/verify-import.mjs",
     "test:auth": "node scripts/verify-auth.mjs",
     "test:staging:guard": "node scripts/verify-staging-guard.mjs",
     "test:staging": "node scripts/verify-staging-auth.mjs",
+    "test:cloudflare:staging": "node scripts/verify-cloudflare-staging.mjs",
     "test": "node scripts/verify-import.mjs && node scripts/verify-insights.mjs && node scripts/verify-reports.mjs && node scripts/verify-dashboard.mjs",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
@@ -104,6 +108,7 @@
     "supabase": "^2.114.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "wrangler": "^4.125.0"
   }
 }

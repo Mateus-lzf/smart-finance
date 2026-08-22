@@ -52,8 +52,9 @@ signing material are forbidden in application env files and Git.
 - Run the opt-in remote test.
 - Validate the application Server Function boundary and sanitized failure states.
 
-### 15D — Cloudflare staging, separately approved
+### 15D - Cloudflare staging, separately approved
 
+- Follow `docs/cloudflare-staging.md` as the deployment runbook.
 - Create a distinct staging deployment and bindings.
 - Allow only exact HTTPS callback URLs.
 - Validate cookies, PKCE, refresh, recovery and logout in the deployed runtime.

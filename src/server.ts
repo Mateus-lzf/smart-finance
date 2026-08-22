@@ -7,6 +7,41 @@ type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
+type RuntimeEnvironment = {
+  SMART_FINANCE_ENVIRONMENT?: string;
+};
+
+function isStagingEnvironment(env: unknown): boolean {
+  return (
+    typeof env === "object" &&
+    env !== null &&
+    (env as RuntimeEnvironment).SMART_FINANCE_ENVIRONMENT === "staging"
+  );
+}
+
+function applyStagingHeaders(response: Response, env: unknown): Response {
+  if (!isStagingEnvironment(env)) return response;
+  const headers = new Headers(response.headers);
+  headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function stagingRobotsResponse(request: Request, env: unknown): Response | undefined {
+  if (!isStagingEnvironment(env) || new URL(request.url).pathname !== "/robots.txt") {
+    return undefined;
+  }
+  return new Response("User-agent: *\nDisallow: /\n", {
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "X-Robots-Tag": "noindex, nofollow, noarchive",
+    },
+  });
+}
+
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
 async function getServerEntry(): Promise<ServerEntry> {
@@ -47,15 +82,20 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const robots = stagingRobotsResponse(request, env);
+      if (robots) return robots;
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return applyStagingHeaders(await normalizeCatastrophicSsrResponse(response), env);
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return applyStagingHeaders(
+        new Response(renderErrorPage(), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+        env,
+      );
     }
   },
 };
