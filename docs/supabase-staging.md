@@ -119,9 +119,10 @@ Sprint 16A moved the current local persistence behind `FinancialRepository` with
 or stored data. Sprint 16B prepares a narrower, authenticated `ProjectRepository` implementation,
 Server Functions and optimistic concurrency behavior for future use. Sprint 16C adds a separate
 `TransactionRepository` for versioned, unitary CRUD while leaving remote import/update operations
-for a later atomic checkpoint. This infrastructure is not connected to the staging UI, was not
-deployed by these checkpoints and does not mix remote Projects or Transactions with the local
-workspace. The staging product continues to use only the per-user local workspace.
+for an atomic checkpoint. Sprint 16D implements that checkpoint locally with transactional,
+idempotent RPCs and a separate inactive `ImportRepository`. None of the Sprint 16B-16D
+infrastructure is connected to the staging UI or deployed by these checkpoints. The staging
+product continues to use only the per-user local workspace.
 
 ## Rollback rules
 

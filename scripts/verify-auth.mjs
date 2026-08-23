@@ -150,6 +150,7 @@ try {
     fetch(`${APP_ORIGIN}/src/lib/auth/auth-functions.ts`),
     fetch(`${APP_ORIGIN}/src/lib/projects/project-functions.ts`),
     fetch(`${APP_ORIGIN}/src/lib/transactions/transaction-functions.ts`),
+    fetch(`${APP_ORIGIN}/src/lib/imports/import-functions.ts`),
   ]);
 
   Object.assign(process.env, {
@@ -164,6 +165,7 @@ try {
   const transactions = createRpcModule(
     await vite.ssrLoadModule("/src/lib/transactions/transaction-functions.ts"),
   );
+  const imports = createRpcModule(await vite.ssrLoadModule("/src/lib/imports/import-functions.ts"));
 
   await runWithStartContext({ startOptions: {} }, async () => {
     const runtimeSources = await Promise.all([
@@ -173,6 +175,8 @@ try {
       readFile("src/lib/projects/supabase-project-store.ts", "utf8"),
       readFile("src/lib/transactions/transaction-functions.ts", "utf8"),
       readFile("src/lib/transactions/supabase-transaction-store.ts", "utf8"),
+      readFile("src/lib/imports/import-functions.ts", "utf8"),
+      readFile("src/lib/imports/supabase-import-store.ts", "utf8"),
       readFile("src/lib/supabase/server-client.ts", "utf8"),
     ]);
     assert.doesNotMatch(
@@ -218,6 +222,15 @@ try {
         }),
       /Server Function rejected the request/,
       "anonymous Transaction access is rejected",
+    );
+    await assert.rejects(
+      () =>
+        imports.prepareRemoteImportUpdate({
+          data: { projectId: "80000000-0000-0000-0000-000000000001", rows: [] },
+          fetch: anonymous.request,
+        }),
+      /Server Function rejected the request/,
+      "anonymous Import access is rejected",
     );
 
     const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -374,6 +387,15 @@ try {
       /Server Function rejected the request/,
       "invalid session cannot access Transaction Server Functions",
     );
+    await assert.rejects(
+      () =>
+        imports.prepareRemoteImportUpdate({
+          data: { projectId: "80000000-0000-0000-0000-000000000001", rows: [] },
+          fetch: invalidSession.request,
+        }),
+      /Server Function rejected the request/,
+      "invalid session cannot access Import Server Functions",
+    );
     const invalidSessionRoute = await invalidSession.request("/dashboard");
     assert.ok([302, 307].includes(invalidSessionRoute.status));
     const invalidSessionDestination = new URL(
@@ -424,6 +446,69 @@ try {
     assert.deepEqual(
       listB.data.map(({ project }) => project.id),
       [projectB.project.id],
+    );
+
+    const importProfile = {
+      headers: ["Data", "Descrição", "Categoria", "Tipo", "Valor", "Filial", "Ativo"],
+      columns: ["date", "description", "category", "type", "amount", "filial", "ativo"].map(
+        (id, index) => ({
+          id,
+          header: ["Data", "Descrição", "Categoria", "Tipo", "Valor", "Filial", "Ativo"][index],
+          index,
+        }),
+      ),
+      mapping: {
+        date: "date",
+        description: "description",
+        category: "category",
+        type: "type",
+        amount: "amount",
+      },
+    };
+    const importedRow = {
+      date: "2026-08-03",
+      description: "Importação Auth",
+      category: "Vendas",
+      type: "receita",
+      amount: 42.5,
+      additionalData: { filial: "Fortaleza", ativo: true },
+    };
+    const initialCommands = clients.map((_, index) => ({
+      idempotencyKey: crypto.randomUUID(),
+      project: { name: `Importação técnica ${index + 1}` },
+      file: { originalFilename: `auth-${index + 1}.csv`, fileHash: `${index + 1}`.repeat(64) },
+      profile: importProfile,
+      rows: [importedRow, importedRow],
+      confirmPossibleDuplicates: true,
+    }));
+    const importedProjects = [];
+    for (let index = 0; index < clients.length; index += 1) {
+      const applied = await imports.applyInitialRemoteImport({
+        data: initialCommands[index],
+        fetch: clients[index].request,
+      });
+      assert.equal(applied.ok, true);
+      assert.equal(applied.data.rowCount, 2);
+      assert.equal(applied.data.duplicateCount, 2);
+      importedProjects.push(applied.data);
+    }
+    const replayedImport = await imports.applyInitialRemoteImport({
+      data: initialCommands[0],
+      fetch: clients[0].request,
+    });
+    assert.equal(replayedImport.ok, true);
+    assert.equal(
+      replayedImport.data.replayed,
+      true,
+      "lost response retry returns committed import",
+    );
+    assert.deepEqual(
+      await imports.prepareRemoteImportUpdate({
+        data: { projectId: importedProjects[0].projectId, rows: [importedRow] },
+        fetch: clients[1].request,
+      }),
+      { ok: false, code: "project_not_found" },
+      "user B cannot prepare an import against user A project",
     );
 
     for (const [actor, target] of [
@@ -805,13 +890,35 @@ try {
       "an owner can delete its current transaction",
     );
 
+    const currentProjectABeforeDelete = await projects.getRemoteProject({
+      data: { id: projectA.project.id },
+      fetch: clients[0].request,
+    });
+    assert.equal(currentProjectABeforeDelete.ok, true);
     assert.deepEqual(
       await projects.deleteRemoteProject({
-        data: { id: projectA.project.id, expectedVersion: 2 },
+        data: {
+          id: projectA.project.id,
+          expectedVersion: currentProjectABeforeDelete.data.version,
+        },
         fetch: clients[0].request,
       }),
       { ok: true, data: null },
     );
+    for (let index = 0; index < importedProjects.length; index += 1) {
+      const current = await projects.getRemoteProject({
+        data: { id: importedProjects[index].projectId },
+        fetch: clients[index].request,
+      });
+      assert.equal(current.ok, true);
+      assert.deepEqual(
+        await projects.deleteRemoteProject({
+          data: { id: importedProjects[index].projectId, expectedVersion: current.data.version },
+          fetch: clients[index].request,
+        }),
+        { ok: true, data: null },
+      );
+    }
     assert.deepEqual(
       await transactions.listRemoteTransactions({
         data: { projectId: projectA.project.id },
@@ -820,9 +927,17 @@ try {
       { ok: false, code: "project_not_found" },
       "transactions are no longer addressable after their project is deleted",
     );
+    const currentProjectBBeforeDelete = await projects.getRemoteProject({
+      data: { id: projectB.project.id },
+      fetch: clients[1].request,
+    });
+    assert.equal(currentProjectBBeforeDelete.ok, true);
     assert.deepEqual(
       await projects.deleteRemoteProject({
-        data: { id: projectB.project.id, expectedVersion: 1 },
+        data: {
+          id: projectB.project.id,
+          expectedVersion: currentProjectBBeforeDelete.data.version,
+        },
         fetch: clients[1].request,
       }),
       { ok: true, data: null },
@@ -925,7 +1040,7 @@ try {
     ]);
     assert.doesNotMatch(
       routeSources.join("\n"),
-      /project-functions|transaction-functions|RemoteProjectRepository|RemoteTransactionRepository|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
+      /project-functions|transaction-functions|import-functions|RemoteProjectRepository|RemoteTransactionRepository|RemoteImportRepository|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
       "product routes do not connect remote repositories or financial tables",
     );
     assert.doesNotMatch(

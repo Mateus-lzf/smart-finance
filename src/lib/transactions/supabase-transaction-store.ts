@@ -1,5 +1,6 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
 import { createSupabaseServerClient } from "../supabase/server-client";
+import type { Json } from "../supabase/database.types";
 import type {
   DeleteTransactionResult,
   GetTransactionResult,
@@ -7,11 +8,7 @@ import type {
   MutateTransactionResult,
   TransactionFunctionErrorCode,
 } from "./transaction-function-types";
-import {
-  mapTransactionRow,
-  transactionCreateInputToPersistence,
-  transactionUpdateInputToPersistence,
-} from "./transaction-mapper";
+import { mapTransactionRow, transactionCreateInputToPersistence } from "./transaction-mapper";
 import type { TransactionCreateInput, TransactionUpdateInput } from "./transaction-repository";
 
 const TRANSACTION_COLUMNS =
@@ -30,23 +27,11 @@ async function ownedProjectExists(projectId: string, ownerUserId: string) {
   return { ok: true as const };
 }
 
-async function classifyMissingMutation(
-  projectId: string,
-  transactionId: string,
-  ownerUserId: string,
-  expectedVersion: number,
-): Promise<TransactionFunctionErrorCode> {
-  const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("transactions")
-    .select("version")
-    .eq("id", transactionId)
-    .eq("project_id", projectId)
-    .eq("owner_user_id", ownerUserId)
-    .maybeSingle();
-  if (error) return "unavailable";
-  if (!data) return "transaction_not_found";
-  return data.version !== expectedVersion ? "conflict" : "unavailable";
+function mutationError(message = ""): TransactionFunctionErrorCode {
+  if (message.includes("project_not_found")) return "project_not_found";
+  if (message.includes("transaction_not_found")) return "transaction_not_found";
+  if (message.includes("transaction_conflict")) return "conflict";
+  return "unavailable";
 }
 
 function unavailableOnMapping<T>(map: () => T) {
@@ -94,89 +79,62 @@ export const createSupabaseTransactionStore = createServerOnlyFn(() => ({
 
   async create(
     projectId: string,
-    ownerUserId: string,
+    _ownerUserId: string,
     input: TransactionCreateInput,
   ): Promise<MutateTransactionResult> {
-    const project = await ownedProjectExists(projectId, ownerUserId);
-    if (!project.ok) return project;
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
-      .from("transactions")
-      .insert({
-        ...transactionCreateInputToPersistence(input),
-        project_id: projectId,
-        owner_user_id: ownerUserId,
+      .rpc("create_financial_transaction", {
+        p_project_id: projectId,
+        p_input: transactionCreateInputToPersistence(input) as unknown as Json,
       })
-      .select(TRANSACTION_COLUMNS)
       .single();
-    if (error || !data) return { ok: false, code: "unavailable" };
+    if (error || !data) return { ok: false, code: mutationError(error?.message) };
     return unavailableOnMapping(() => mapTransactionRow(data));
   },
 
   async update(
     projectId: string,
     transactionId: string,
-    ownerUserId: string,
+    _ownerUserId: string,
     expectedVersion: number,
     input: TransactionUpdateInput,
   ): Promise<MutateTransactionResult> {
-    const project = await ownedProjectExists(projectId, ownerUserId);
-    if (!project.ok) return project;
     const supabase = createSupabaseServerClient();
-    const { data: current, error: currentError } = await supabase
-      .from("transactions")
-      .select("version,origin")
-      .eq("id", transactionId)
-      .eq("project_id", projectId)
-      .eq("owner_user_id", ownerUserId)
-      .maybeSingle();
-    if (currentError) return { ok: false, code: "unavailable" };
-    if (!current) return { ok: false, code: "transaction_not_found" };
-    if (current.version !== expectedVersion) return { ok: false, code: "conflict" };
-
     const { data, error } = await supabase
-      .from("transactions")
-      .update({
-        ...transactionUpdateInputToPersistence(input, current.origin === "imported"),
-        version: expectedVersion + 1,
+      .rpc("update_financial_transaction", {
+        p_project_id: projectId,
+        p_transaction_id: transactionId,
+        p_expected_version: expectedVersion,
+        p_input: {
+          ...(input.date !== undefined ? { date: input.date } : {}),
+          ...(input.description !== undefined ? { description: input.description.trim() } : {}),
+          ...(input.category !== undefined ? { category: input.category.trim() } : {}),
+          ...(input.type !== undefined ? { type: input.type } : {}),
+          ...(input.amount !== undefined ? { amount: input.amount } : {}),
+          ...(input.additionalData !== undefined
+            ? { additional_data: input.additionalData as Json }
+            : {}),
+        },
       })
-      .eq("id", transactionId)
-      .eq("project_id", projectId)
-      .eq("owner_user_id", ownerUserId)
-      .eq("version", expectedVersion)
-      .select(TRANSACTION_COLUMNS)
-      .maybeSingle();
-    if (error) return { ok: false, code: "unavailable" };
-    if (data) return unavailableOnMapping(() => mapTransactionRow(data));
-    return {
-      ok: false,
-      code: await classifyMissingMutation(projectId, transactionId, ownerUserId, expectedVersion),
-    };
+      .single();
+    if (error || !data) return { ok: false, code: mutationError(error?.message) };
+    return unavailableOnMapping(() => mapTransactionRow(data));
   },
 
   async delete(
     projectId: string,
     transactionId: string,
-    ownerUserId: string,
+    _ownerUserId: string,
     expectedVersion: number,
   ): Promise<DeleteTransactionResult> {
-    const project = await ownedProjectExists(projectId, ownerUserId);
-    if (!project.ok) return project;
     const supabase = createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", transactionId)
-      .eq("project_id", projectId)
-      .eq("owner_user_id", ownerUserId)
-      .eq("version", expectedVersion)
-      .select("id")
-      .maybeSingle();
-    if (error) return { ok: false, code: "unavailable" };
-    if (data) return { ok: true, data: null };
-    return {
-      ok: false,
-      code: await classifyMissingMutation(projectId, transactionId, ownerUserId, expectedVersion),
-    };
+    const { data, error } = await supabase.rpc("delete_financial_transaction", {
+      p_project_id: projectId,
+      p_transaction_id: transactionId,
+      p_expected_version: expectedVersion,
+    });
+    if (error || data !== true) return { ok: false, code: mutationError(error?.message) };
+    return { ok: true, data: null };
   },
 }));

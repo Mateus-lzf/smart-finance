@@ -55,13 +55,19 @@ export type Database = {
           error_code: string | null;
           file_hash: string | null;
           id: string;
+          idempotency_key: string | null;
+          manual_overwrite_count: number;
           operation: string;
           original_filename: string | null;
           owner_user_id: string;
+          preserved_manual_count: number;
           project_id: string;
           removed_count: number;
+          request_hash: string | null;
+          result_project_version: number | null;
           row_count: number;
           status: string;
+          unchanged_count: number;
         };
         Insert: {
           added_count?: number;
@@ -73,13 +79,19 @@ export type Database = {
           error_code?: string | null;
           file_hash?: string | null;
           id?: string;
+          idempotency_key?: string | null;
+          manual_overwrite_count?: number;
           operation: string;
           original_filename?: string | null;
           owner_user_id: string;
+          preserved_manual_count?: number;
           project_id: string;
           removed_count?: number;
+          request_hash?: string | null;
+          result_project_version?: number | null;
           row_count?: number;
           status?: string;
+          unchanged_count?: number;
         };
         Update: {
           added_count?: number;
@@ -91,13 +103,19 @@ export type Database = {
           error_code?: string | null;
           file_hash?: string | null;
           id?: string;
+          idempotency_key?: string | null;
+          manual_overwrite_count?: number;
           operation?: string;
           original_filename?: string | null;
           owner_user_id?: string;
+          preserved_manual_count?: number;
           project_id?: string;
           removed_count?: number;
+          request_hash?: string | null;
+          result_project_version?: number | null;
           row_count?: number;
           status?: string;
+          unchanged_count?: number;
         };
         Relationships: [
           {
@@ -275,7 +293,85 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      apply_financial_import_update: {
+        Args: {
+          p_base_project_version: number;
+          p_idempotency_key: string;
+          p_plan: Json;
+          p_project_id: string;
+          p_request: Json;
+        };
+        Returns: Json;
+      };
+      apply_initial_financial_import: {
+        Args: { p_idempotency_key: string; p_request: Json };
+        Returns: Json;
+      };
+      create_financial_transaction: {
+        Args: { p_input: Json; p_project_id: string };
+        Returns: {
+          additional_data: Json;
+          amount: number;
+          category: string;
+          created_at: string;
+          date: string;
+          description: string;
+          id: string;
+          import_run_id: string | null;
+          manually_modified: boolean;
+          origin: string;
+          owner_user_id: string;
+          project_id: string;
+          type: string;
+          updated_at: string;
+          version: number;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "transactions";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      delete_financial_transaction: {
+        Args: {
+          p_expected_version: number;
+          p_project_id: string;
+          p_transaction_id: string;
+        };
+        Returns: boolean;
+      };
+      update_financial_transaction: {
+        Args: {
+          p_expected_version: number;
+          p_input: Json;
+          p_project_id: string;
+          p_transaction_id: string;
+        };
+        Returns: {
+          additional_data: Json;
+          amount: number;
+          category: string;
+          created_at: string;
+          date: string;
+          description: string;
+          id: string;
+          import_run_id: string | null;
+          manually_modified: boolean;
+          origin: string;
+          owner_user_id: string;
+          project_id: string;
+          type: string;
+          updated_at: string;
+          version: number;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "transactions";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;

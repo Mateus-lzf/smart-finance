@@ -157,23 +157,27 @@ try {
     );
   }
 
-  const [appStoreSource, functionsSource, storeSource, remoteSource] = await Promise.all([
-    readFile("src/lib/app-store.tsx", "utf8"),
-    readFile("src/lib/transactions/transaction-functions.ts", "utf8"),
-    readFile("src/lib/transactions/supabase-transaction-store.ts", "utf8"),
-    readFile("src/lib/transactions/remote-transaction-repository.ts", "utf8"),
-  ]);
+  const [appStoreSource, functionsSource, storeSource, remoteSource, migrationSource] =
+    await Promise.all([
+      readFile("src/lib/app-store.tsx", "utf8"),
+      readFile("src/lib/transactions/transaction-functions.ts", "utf8"),
+      readFile("src/lib/transactions/supabase-transaction-store.ts", "utf8"),
+      readFile("src/lib/transactions/remote-transaction-repository.ts", "utf8"),
+      readFile("supabase/migrations/202608220001_create_atomic_import_rpcs.sql", "utf8"),
+    ]);
   assert.match(appStoreSource, /createLocalFinancialRepository\(userId\)/);
   assert.doesNotMatch(appStoreSource, /RemoteTransactionRepository|transaction-functions/);
   assert.match(functionsSource, /context\.user\.id/);
   assert.doesNotMatch(functionsSource, /owner_user_id|import_run_id|manually_modified/);
-  assert.match(storeSource, /owner_user_id: ownerUserId/);
-  assert.match(storeSource, /project_id: projectId/);
-  assert.match(storeSource, /current\.origin === "imported"/);
-  assert.match(storeSource, /\.eq\("version", expectedVersion\)/);
-  assert.match(storeSource, /version: expectedVersion \+ 1/);
+  assert.doesNotMatch(storeSource, /owner_user_id\s*:/);
+  assert.match(storeSource, /create_financial_transaction/);
+  assert.match(storeSource, /update_financial_transaction/);
+  assert.match(storeSource, /delete_financial_transaction/);
+  assert.match(migrationSource, /v_owner uuid := auth\.uid\(\)/);
+  assert.match(migrationSource, /manually_modified = manually_modified or origin = 'imported'/);
+  assert.match(migrationSource, /update public\.projects set version = v_project_version \+ 1/);
   assert.doesNotMatch(
-    [functionsSource, storeSource, remoteSource].join("\n"),
+    [functionsSource, storeSource, remoteSource, migrationSource].join("\n"),
     /service[_-]?role|sb_secret_|admin[_-]?key|database[_-]?password/i,
   );
 
