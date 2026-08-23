@@ -99,14 +99,23 @@ try {
     "legacy data remains available for a future explicit migration",
   );
 
-  const [routeSource, appStoreSource, localRepositorySource, projectFunctions, projectStore] =
-    await Promise.all([
-      readFile("src/routes/_authenticated.tsx", "utf8"),
-      readFile("src/lib/app-store.tsx", "utf8"),
-      readFile("src/lib/local-financial-repository.ts", "utf8"),
-      readFile("src/lib/projects/project-functions.ts", "utf8"),
-      readFile("src/lib/projects/supabase-project-store.ts", "utf8"),
-    ]);
+  const [
+    routeSource,
+    appStoreSource,
+    localRepositorySource,
+    projectFunctions,
+    projectStore,
+    transactionFunctions,
+    transactionStore,
+  ] = await Promise.all([
+    readFile("src/routes/_authenticated.tsx", "utf8"),
+    readFile("src/lib/app-store.tsx", "utf8"),
+    readFile("src/lib/local-financial-repository.ts", "utf8"),
+    readFile("src/lib/projects/project-functions.ts", "utf8"),
+    readFile("src/lib/projects/supabase-project-store.ts", "utf8"),
+    readFile("src/lib/transactions/transaction-functions.ts", "utf8"),
+    readFile("src/lib/transactions/supabase-transaction-store.ts", "utf8"),
+  ]);
   assert.match(routeSource, /userId=\{user\.id\}/, "the validated auth user scopes AppProvider");
   assert.match(routeSource, /key=\{user\.id\}/, "account changes reset the financial provider");
   assert.doesNotMatch(
@@ -118,20 +127,23 @@ try {
   assert.match(localRepositorySource, /getUserLocalStateKey\(userId\)/);
   assert.doesNotMatch(
     appStoreSource,
-    /project-functions|RemoteProjectRepository|\.from\(["'](?:projects|transactions)["']\)/,
-    "the financial UI does not read the remote project infrastructure",
+    /project-functions|transaction-functions|RemoteProjectRepository|RemoteTransactionRepository|\.from\(["'](?:projects|transactions)["']\)/,
+    "the financial UI does not read remote Project or Transaction infrastructure",
   );
   assert.match(projectFunctions, /context\.user\.id/);
   assert.doesNotMatch(projectFunctions, /owner_user_id/);
   assert.match(projectStore, /owner_user_id: ownerUserId/);
+  assert.match(transactionFunctions, /context\.user\.id/);
+  assert.doesNotMatch(transactionFunctions, /owner_user_id|import_run_id|manually_modified/);
+  assert.match(transactionStore, /owner_user_id: ownerUserId/);
   assert.doesNotMatch(
-    `${projectFunctions}\n${projectStore}`,
+    `${projectFunctions}\n${projectStore}\n${transactionFunctions}\n${transactionStore}`,
     /service_role|sb_secret_|SUPABASE_SERVICE/,
   );
 
   console.log("Isolamento local por usuário, refresh e troca de conta: OK");
   console.log("Estado legado global preservado sem atribuição silenciosa: OK");
-  console.log("UI financeira permanece desconectada da infraestrutura remota de Projects: OK");
+  console.log("UI financeira permanece desconectada de Projects e Transactions remotos: OK");
 } finally {
   await vite.close();
 }

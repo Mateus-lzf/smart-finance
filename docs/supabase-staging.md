@@ -117,9 +117,11 @@ financial source of truth.
 
 Sprint 16A moved the current local persistence behind `FinancialRepository` without changing keys
 or stored data. Sprint 16B prepares a narrower, authenticated `ProjectRepository` implementation,
-Server Functions and optimistic concurrency behavior for future use. This infrastructure is not
-connected to the staging UI, was not deployed by Sprint 16B and does not mix remote Projects with
-local Transactions. The staging product continues to use only the per-user local workspace.
+Server Functions and optimistic concurrency behavior for future use. Sprint 16C adds a separate
+`TransactionRepository` for versioned, unitary CRUD while leaving remote import/update operations
+for a later atomic checkpoint. This infrastructure is not connected to the staging UI, was not
+deployed by these checkpoints and does not mix remote Projects or Transactions with the local
+workspace. The staging product continues to use only the per-user local workspace.
 
 ## Rollback rules
 

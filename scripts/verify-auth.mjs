@@ -149,6 +149,7 @@ try {
   await Promise.all([
     fetch(`${APP_ORIGIN}/src/lib/auth/auth-functions.ts`),
     fetch(`${APP_ORIGIN}/src/lib/projects/project-functions.ts`),
+    fetch(`${APP_ORIGIN}/src/lib/transactions/transaction-functions.ts`),
   ]);
 
   Object.assign(process.env, {
@@ -160,6 +161,9 @@ try {
   const projects = createRpcModule(
     await vite.ssrLoadModule("/src/lib/projects/project-functions.ts"),
   );
+  const transactions = createRpcModule(
+    await vite.ssrLoadModule("/src/lib/transactions/transaction-functions.ts"),
+  );
 
   await runWithStartContext({ startOptions: {} }, async () => {
     const runtimeSources = await Promise.all([
@@ -167,6 +171,8 @@ try {
       readFile("src/lib/auth/auth-server.ts", "utf8"),
       readFile("src/lib/projects/project-functions.ts", "utf8"),
       readFile("src/lib/projects/supabase-project-store.ts", "utf8"),
+      readFile("src/lib/transactions/transaction-functions.ts", "utf8"),
+      readFile("src/lib/transactions/supabase-transaction-store.ts", "utf8"),
       readFile("src/lib/supabase/server-client.ts", "utf8"),
     ]);
     assert.doesNotMatch(
@@ -203,6 +209,15 @@ try {
       () => projects.listRemoteProjects({ fetch: anonymous.request }),
       /Server Function rejected the request/,
       "anonymous Server Function access is rejected",
+    );
+    await assert.rejects(
+      () =>
+        transactions.listRemoteTransactions({
+          data: { projectId: "80000000-0000-0000-0000-000000000001" },
+          fetch: anonymous.request,
+        }),
+      /Server Function rejected the request/,
+      "anonymous Transaction access is rejected",
     );
 
     const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -350,6 +365,15 @@ try {
       /Server Function rejected the request/,
       "invalid session cannot access protected Server Functions",
     );
+    await assert.rejects(
+      () =>
+        transactions.listRemoteTransactions({
+          data: { projectId: "80000000-0000-0000-0000-000000000001" },
+          fetch: invalidSession.request,
+        }),
+      /Server Function rejected the request/,
+      "invalid session cannot access Transaction Server Functions",
+    );
     const invalidSessionRoute = await invalidSession.request("/dashboard");
     assert.ok([302, 307].includes(invalidSessionRoute.status));
     const invalidSessionDestination = new URL(
@@ -464,12 +488,337 @@ try {
       "stale delete is reported as a conflict",
     );
 
+    const identicalInput = {
+      date: "2026-08-01",
+      description: "Venda idêntica",
+      category: "Comercial",
+      type: "receita",
+      amount: 125.5,
+      origin: "manual",
+      additionalData: {
+        filial: "Fortaleza",
+        quantidade: 2,
+        ativo: true,
+        vazio: null,
+        competencia: "2026-08-01",
+      },
+    };
+    for (const [actor, forgedOwner] of [
+      [clients[0], accounts[1].email],
+      [clients[1], accounts[0].email],
+    ]) {
+      await assert.rejects(
+        () =>
+          transactions.createRemoteTransaction({
+            data: {
+              projectId: actor === clients[0] ? projectA.project.id : projectB.project.id,
+              input: identicalInput,
+              owner_user_id: forgedOwner,
+            },
+            fetch: actor.request,
+          }),
+        /Server Function rejected the request/,
+        "owner_user_id is rejected in both directions",
+      );
+    }
+    await assert.rejects(
+      () =>
+        transactions.createRemoteTransaction({
+          data: {
+            projectId: projectA.project.id,
+            input: { ...identicalInput, amount: 10.001 },
+          },
+          fetch: clients[0].request,
+        }),
+      /Server Function rejected the request/,
+      "amounts incompatible with numeric cents are rejected",
+    );
+    await assert.rejects(
+      () =>
+        transactions.createRemoteTransaction({
+          data: {
+            projectId: projectA.project.id,
+            input: { ...identicalInput, date: "2026-08-01T00:00:00.000Z" },
+          },
+          fetch: clients[0].request,
+        }),
+      /Server Function rejected the request/,
+      "financial dates must be exact date-only values",
+    );
+    for (const [field, value] of [
+      ["id", "94000000-0000-0000-0000-000000000001"],
+      ["project_id", projectB.project.id],
+      ["version", 99],
+      ["import_run_id", "95000000-0000-0000-0000-000000000001"],
+      ["manually_modified", true],
+      ["created_at", "2026-08-01T00:00:00.000Z"],
+      ["updated_at", "2026-08-01T00:00:00.000Z"],
+    ]) {
+      await assert.rejects(
+        () =>
+          transactions.createRemoteTransaction({
+            data: {
+              projectId: projectA.project.id,
+              input: { ...identicalInput, [field]: value },
+            },
+            fetch: clients[0].request,
+          }),
+        /Server Function rejected the request/,
+        `${field} cannot be controlled on create`,
+      );
+    }
+    assert.deepEqual(
+      await transactions.createRemoteTransaction({
+        data: { projectId: projectB.project.id, input: identicalInput },
+        fetch: clients[0].request,
+      }),
+      { ok: false, code: "project_not_found" },
+      "user A cannot create a transaction in user B project",
+    );
+    assert.deepEqual(
+      await transactions.createRemoteTransaction({
+        data: { projectId: projectA.project.id, input: identicalInput },
+        fetch: clients[1].request,
+      }),
+      { ok: false, code: "project_not_found" },
+      "user B cannot create a transaction in user A project",
+    );
+
+    const createdManualA1 = await transactions.createRemoteTransaction({
+      data: { projectId: projectA.project.id, input: identicalInput },
+      fetch: clients[0].request,
+    });
+    const createdManualA2 = await transactions.createRemoteTransaction({
+      data: { projectId: projectA.project.id, input: identicalInput },
+      fetch: clients[0].request,
+    });
+    const createdImportedA = await transactions.createRemoteTransaction({
+      data: {
+        projectId: projectA.project.id,
+        input: { ...identicalInput, origin: "imported" },
+      },
+      fetch: clients[0].request,
+    });
+    const createdBTransaction = await transactions.createRemoteTransaction({
+      data: {
+        projectId: projectB.project.id,
+        input: {
+          date: "2026-08-02",
+          description: "Despesa B",
+          category: "Operacional",
+          type: "despesa",
+          amount: 50.25,
+          origin: "manual",
+        },
+      },
+      fetch: clients[1].request,
+    });
+    for (const created of [
+      createdManualA1,
+      createdManualA2,
+      createdImportedA,
+      createdBTransaction,
+    ]) {
+      assert.equal(created.ok, true);
+      assert.equal(created.data.version, 1);
+      assert.equal("owner_user_id" in created.data, false);
+    }
+    assert.notEqual(
+      createdManualA1.data.transaction.id,
+      createdManualA2.data.transaction.id,
+      "identical legitimate occurrences receive distinct UUIDs",
+    );
+
+    const transactionListA = await transactions.listRemoteTransactions({
+      data: { projectId: projectA.project.id },
+      fetch: clients[0].request,
+    });
+    assert.equal(transactionListA.ok, true);
+    assert.equal(transactionListA.data.length, 3, "no identical occurrence is deduplicated");
+    assert.equal(
+      transactionListA.data.filter(({ transaction }) => transaction.origin === "manual").length,
+      2,
+      "two identical manual occurrences are preserved",
+    );
+    assert.equal(
+      transactionListA.data.filter(({ transaction }) => transaction.origin === "imported").length,
+      1,
+      "an identical imported occurrence remains separate",
+    );
+    assert.deepEqual(
+      transactionListA.data.map(({ transaction }) => transaction.id),
+      transactionListA.data.map(({ transaction }) => transaction.id).sort(),
+      "same-date rows use deterministic UUID ordering",
+    );
+    assert.deepEqual(
+      createdImportedA.data.transaction.additionalData,
+      identicalInput.additionalData,
+    );
+    assert.equal(createdImportedA.data.transaction.date, "2026-08-01");
+    assert.equal(createdImportedA.data.transaction.amount, 125.5);
+
+    for (const [actor, ownProject, foreignProject, foreignTransaction] of [
+      [clients[0], projectA, projectB, createdBTransaction.data],
+      [clients[1], projectB, projectA, createdManualA1.data],
+    ]) {
+      assert.deepEqual(
+        await transactions.getRemoteTransaction({
+          data: {
+            projectId: foreignProject.project.id,
+            transactionId: foreignTransaction.transaction.id,
+          },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "project_not_found" },
+        "a foreign project is indistinguishable from a missing project",
+      );
+      assert.deepEqual(
+        await transactions.updateRemoteTransaction({
+          data: {
+            projectId: foreignProject.project.id,
+            transactionId: foreignTransaction.transaction.id,
+            expectedVersion: foreignTransaction.version,
+            input: { description: "Tentativa em projeto alheio" },
+          },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "project_not_found" },
+        "cross-owner update through a foreign project reveals no project",
+      );
+      assert.deepEqual(
+        await transactions.deleteRemoteTransaction({
+          data: {
+            projectId: foreignProject.project.id,
+            transactionId: foreignTransaction.transaction.id,
+            expectedVersion: foreignTransaction.version,
+          },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "project_not_found" },
+        "cross-owner delete through a foreign project reveals no project",
+      );
+      assert.deepEqual(
+        await transactions.getRemoteTransaction({
+          data: {
+            projectId: ownProject.project.id,
+            transactionId: foreignTransaction.transaction.id,
+          },
+          fetch: actor.request,
+        }),
+        { ok: true, data: null },
+        "a foreign transaction id is invisible inside an owned project",
+      );
+      assert.deepEqual(
+        await transactions.updateRemoteTransaction({
+          data: {
+            projectId: ownProject.project.id,
+            transactionId: foreignTransaction.transaction.id,
+            expectedVersion: foreignTransaction.version,
+            input: { description: "Tentativa cruzada" },
+          },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "transaction_not_found" },
+        "cross-owner update reveals no foreign transaction",
+      );
+      assert.deepEqual(
+        await transactions.deleteRemoteTransaction({
+          data: {
+            projectId: ownProject.project.id,
+            transactionId: foreignTransaction.transaction.id,
+            expectedVersion: foreignTransaction.version,
+          },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "transaction_not_found" },
+        "cross-owner delete reveals no foreign transaction",
+      );
+    }
+
+    const updatedImported = await transactions.updateRemoteTransaction({
+      data: {
+        projectId: projectA.project.id,
+        transactionId: createdImportedA.data.transaction.id,
+        expectedVersion: 1,
+        input: { description: "Venda importada editada" },
+      },
+      fetch: clients[0].request,
+    });
+    assert.equal(updatedImported.ok, true);
+    assert.equal(updatedImported.data.version, 2);
+    assert.equal(updatedImported.data.transaction.origin, "imported");
+    assert.equal(updatedImported.data.transaction.manuallyModified, true);
+    assert.deepEqual(
+      updatedImported.data.transaction.additionalData,
+      identicalInput.additionalData,
+      "editing core fields preserves additionalData",
+    );
+    await assert.rejects(
+      () =>
+        transactions.updateRemoteTransaction({
+          data: {
+            projectId: projectA.project.id,
+            transactionId: createdImportedA.data.transaction.id,
+            expectedVersion: 2,
+            input: { origin: "manual" },
+          },
+          fetch: clients[0].request,
+        }),
+      /Server Function rejected the request/,
+      "origin is immutable after creation",
+    );
+    assert.deepEqual(
+      await transactions.updateRemoteTransaction({
+        data: {
+          projectId: projectA.project.id,
+          transactionId: createdImportedA.data.transaction.id,
+          expectedVersion: 1,
+          input: { amount: 200 },
+        },
+        fetch: clients[0].request,
+      }),
+      { ok: false, code: "conflict" },
+      "a stale transaction update returns a conflict",
+    );
+    assert.deepEqual(
+      await transactions.deleteRemoteTransaction({
+        data: {
+          projectId: projectA.project.id,
+          transactionId: createdImportedA.data.transaction.id,
+          expectedVersion: 1,
+        },
+        fetch: clients[0].request,
+      }),
+      { ok: false, code: "conflict" },
+      "a stale transaction delete returns a conflict",
+    );
+    assert.deepEqual(
+      await transactions.deleteRemoteTransaction({
+        data: {
+          projectId: projectB.project.id,
+          transactionId: createdBTransaction.data.transaction.id,
+          expectedVersion: 1,
+        },
+        fetch: clients[1].request,
+      }),
+      { ok: true, data: null },
+      "an owner can delete its current transaction",
+    );
+
     assert.deepEqual(
       await projects.deleteRemoteProject({
         data: { id: projectA.project.id, expectedVersion: 2 },
         fetch: clients[0].request,
       }),
       { ok: true, data: null },
+    );
+    assert.deepEqual(
+      await transactions.listRemoteTransactions({
+        data: { projectId: projectA.project.id },
+        fetch: clients[0].request,
+      }),
+      { ok: false, code: "project_not_found" },
+      "transactions are no longer addressable after their project is deleted",
     );
     assert.deepEqual(
       await projects.deleteRemoteProject({
@@ -557,6 +906,15 @@ try {
       /Server Function rejected the request/,
       "logged-out session cannot access protected Server Functions",
     );
+    await assert.rejects(
+      () =>
+        transactions.listRemoteTransactions({
+          data: { projectId: projectA.project.id },
+          fetch: clients[0].request,
+        }),
+      /Server Function rejected the request/,
+      "logged-out session cannot access Transaction Server Functions",
+    );
 
     const routeSources = await Promise.all([
       readFile("src/routes/_authenticated.tsx", "utf8"),
@@ -567,8 +925,8 @@ try {
     ]);
     assert.doesNotMatch(
       routeSources.join("\n"),
-      /project-functions|RemoteProjectRepository|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
-      "product routes do not connect the technical remote vertical or financial tables",
+      /project-functions|transaction-functions|RemoteProjectRepository|RemoteTransactionRepository|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
+      "product routes do not connect remote repositories or financial tables",
     );
     assert.doesNotMatch(
       routeSources.join("\n"),

@@ -3,8 +3,9 @@
 Sprint 14A adds a local PostgreSQL/Supabase foundation. Sprint 14B adds authentication and the
 server-session boundary. Sprint 16A introduces the financial persistence contract with the local
 adapter, and Sprint 16B prepares authenticated remote Project operations behind a separate,
-inactive repository. The application continues to use `LocalFinancialRepository` and
-`localStorage` as its only financial source.
+inactive repository. Sprint 16C adds an equally inactive, versioned Transaction repository for
+unitary CRUD. The application continues to use `LocalFinancialRepository` and `localStorage` as
+its only financial source.
 
 ## Prerequisites
 
@@ -23,6 +24,7 @@ bun run db:test
 bun run db:lint
 bun run db:types
 bun run test:projects
+bun run test:transactions
 bun run test:auth
 bun run db:stop
 ```
@@ -83,6 +85,12 @@ are not imported by any route or by the financial product UI.
 
 `test:projects` is an offline contract/mapping test. It validates the domain/database mapper,
 repository error semantics and static security boundaries without contacting Supabase.
+
+`test:transactions` performs the equivalent offline validation for Transactions, including
+date-only values, safe monetary cents, scalar `additionalData`, immutable provenance and the
+absence of remote imports in the financial UI. The Auth integration additionally proves unitary
+Transaction CRUD, optimistic concurrency, legitimate identical occurrences and symmetric A/B
+isolation against local PostgreSQL/RLS.
 
 ## Security boundary
 
@@ -211,10 +219,11 @@ Cloudflare Access was not configured because the Zero Trust Free onboarding requ
 method and no card was registered. This is not an application failure, but Access or an equivalent
 protection must be reconsidered before commercial/production exposure or broader staging access.
 
-The Project-only remote infrastructure prepared in Sprint 16B is not a second financial source and
-does not activate remote persistence. Transactions, preferences, imports, assisted and reversible
-local-data migration, atomic remote imports and explicit protection against duplicates remain
-subsequent Sprint 16 checkpoints. Production separation, domain,
+The Project and Transaction remote infrastructure prepared in Sprints 16B/16C is not a second
+financial source and does not activate remote persistence. Transaction CRUD is deliberately
+unitary and must never be used in a loop as an import mechanism. Preferences, import runs/profiles,
+assisted and reversible local-data migration and atomic remote imports remain subsequent Sprint 16
+checkpoints. Production separation, domain,
 SMTP, rate limiting, observability, backup/recovery, account export/deletion, LGPD operations,
 secret rotation and rollback remain additional commercial work. None of these capabilities was
 implemented by Sprint 15.
