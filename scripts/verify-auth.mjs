@@ -148,7 +148,7 @@ try {
   await waitForServer();
   await Promise.all([
     fetch(`${APP_ORIGIN}/src/lib/auth/auth-functions.ts`),
-    fetch(`${APP_ORIGIN}/src/lib/auth/technical-project-functions.ts`),
+    fetch(`${APP_ORIGIN}/src/lib/projects/project-functions.ts`),
   ]);
 
   Object.assign(process.env, {
@@ -158,14 +158,15 @@ try {
   vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
   const auth = createRpcModule(await vite.ssrLoadModule("/src/lib/auth/auth-functions.ts"));
   const projects = createRpcModule(
-    await vite.ssrLoadModule("/src/lib/auth/technical-project-functions.ts"),
+    await vite.ssrLoadModule("/src/lib/projects/project-functions.ts"),
   );
 
   await runWithStartContext({ startOptions: {} }, async () => {
     const runtimeSources = await Promise.all([
       readFile("src/lib/auth/auth-functions.ts", "utf8"),
       readFile("src/lib/auth/auth-server.ts", "utf8"),
-      readFile("src/lib/auth/technical-project-functions.ts", "utf8"),
+      readFile("src/lib/projects/project-functions.ts", "utf8"),
+      readFile("src/lib/projects/supabase-project-store.ts", "utf8"),
       readFile("src/lib/supabase/server-client.ts", "utf8"),
     ]);
     assert.doesNotMatch(
@@ -199,7 +200,7 @@ try {
     assert.equal(loginLocation.pathname, "/login");
     assert.equal(loginLocation.searchParams.get("redirect"), "/dashboard");
     await assert.rejects(
-      () => projects.listTechnicalProjects({ fetch: anonymous.request }),
+      () => projects.listRemoteProjects({ fetch: anonymous.request }),
       /Server Function rejected the request/,
       "anonymous Server Function access is rejected",
     );
@@ -345,7 +346,7 @@ try {
       "invalid session token is rejected safely",
     );
     await assert.rejects(
-      () => projects.listTechnicalProjects({ fetch: invalidSession.request }),
+      () => projects.listRemoteProjects({ fetch: invalidSession.request }),
       /Server Function rejected the request/,
       "invalid session cannot access protected Server Functions",
     );
@@ -362,48 +363,120 @@ try {
       "invalid session redirects once with a factual reason",
     );
 
-    const projectA = await projects.createTechnicalProject({
-      data: { name: "Projeto técnico A", owner_user_id: "client-controlled-value" },
-      fetch: clients[0].request,
-    });
-    const projectB = await projects.createTechnicalProject({
-      data: { name: "Projeto técnico B" },
-      fetch: clients[1].request,
-    });
-    assert.notEqual(
-      projectA.owner_user_id,
-      projectB.owner_user_id,
-      "owners derive from distinct sessions",
+    await assert.rejects(
+      () =>
+        projects.createRemoteProject({
+          data: { name: "Ownership forjado", owner_user_id: accounts[1].email },
+          fetch: clients[0].request,
+        }),
+      /Server Function rejected the request/,
+      "owner_user_id is rejected instead of trusted from the browser",
     );
 
-    const listA = await projects.listTechnicalProjects({ fetch: clients[0].request });
-    const listB = await projects.listTechnicalProjects({ fetch: clients[1].request });
+    const createdA = await projects.createRemoteProject({
+      data: { name: "Projeto remoto A", type: "Comercial", description: "Pertence a A" },
+      fetch: clients[0].request,
+    });
+    const createdB = await projects.createRemoteProject({
+      data: { name: "Projeto remoto B", description: "Pertence a B" },
+      fetch: clients[1].request,
+    });
+    assert.equal(createdA.ok, true);
+    assert.equal(createdB.ok, true);
+    const projectA = createdA.data;
+    const projectB = createdB.data;
+    assert.equal(projectA.version, 1);
+    assert.equal(projectB.version, 1);
+    assert.equal("owner_user_id" in projectA, false, "ownership is not exposed as domain data");
+
+    const listA = await projects.listRemoteProjects({ fetch: clients[0].request });
+    const listB = await projects.listRemoteProjects({ fetch: clients[1].request });
+    assert.equal(listA.ok, true);
+    assert.equal(listB.ok, true);
     assert.deepEqual(
-      listA.map((project) => project.id),
-      [projectA.id],
+      listA.data.map(({ project }) => project.id),
+      [projectA.project.id],
     );
     assert.deepEqual(
-      listB.map((project) => project.id),
-      [projectB.id],
+      listB.data.map(({ project }) => project.id),
+      [projectB.project.id],
     );
-    assert.equal(
-      await projects.getTechnicalProject({ data: { id: projectB.id }, fetch: clients[0].request }),
-      null,
-      "user A cannot read user B project",
-    );
-    assert.equal(
-      await projects.updateTechnicalProject({
-        data: { id: projectB.id, name: "Tentativa de alteração" },
+
+    for (const [actor, target] of [
+      [clients[0], projectB],
+      [clients[1], projectA],
+    ]) {
+      assert.deepEqual(
+        await projects.getRemoteProject({ data: { id: target.project.id }, fetch: actor.request }),
+        { ok: true, data: null },
+        "cross-owner read returns no project",
+      );
+      assert.deepEqual(
+        await projects.updateRemoteProject({
+          data: {
+            id: target.project.id,
+            expectedVersion: target.version,
+            input: { name: "Tentativa cruzada" },
+          },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "not_found" },
+        "cross-owner update cannot distinguish a hidden project",
+      );
+      assert.deepEqual(
+        await projects.deleteRemoteProject({
+          data: { id: target.project.id, expectedVersion: target.version },
+          fetch: actor.request,
+        }),
+        { ok: false, code: "not_found" },
+        "cross-owner delete cannot distinguish a hidden project",
+      );
+    }
+
+    const updatedA = await projects.updateRemoteProject({
+      data: {
+        id: projectA.project.id,
+        expectedVersion: projectA.version,
+        input: { name: "Projeto remoto A alterado", type: "Serviços" },
+      },
+      fetch: clients[0].request,
+    });
+    assert.equal(updatedA.ok, true);
+    assert.equal(updatedA.data.version, 2, "successful update advances the version");
+    assert.deepEqual(
+      await projects.updateRemoteProject({
+        data: {
+          id: projectA.project.id,
+          expectedVersion: 1,
+          input: { name: "Atualização obsoleta" },
+        },
         fetch: clients[0].request,
       }),
-      null,
-      "user A cannot update user B project",
+      { ok: false, code: "conflict" },
+      "stale update is reported as a conflict",
     );
-    assert.equal(
-      (await projects.getTechnicalProject({ data: { id: projectB.id }, fetch: clients[1].request }))
-        .name,
-      "Projeto técnico B",
-      "user B project remains unchanged",
+    assert.deepEqual(
+      await projects.deleteRemoteProject({
+        data: { id: projectA.project.id, expectedVersion: 1 },
+        fetch: clients[0].request,
+      }),
+      { ok: false, code: "conflict" },
+      "stale delete is reported as a conflict",
+    );
+
+    assert.deepEqual(
+      await projects.deleteRemoteProject({
+        data: { id: projectA.project.id, expectedVersion: 2 },
+        fetch: clients[0].request,
+      }),
+      { ok: true, data: null },
+    );
+    assert.deepEqual(
+      await projects.deleteRemoteProject({
+        data: { id: projectB.project.id, expectedVersion: 1 },
+        fetch: clients[1].request,
+      }),
+      { ok: true, data: null },
     );
 
     const refreshed = await auth.refreshCurrentSession({ fetch: clients[0].request });
@@ -480,7 +553,7 @@ try {
       "logout clears session",
     );
     await assert.rejects(
-      () => projects.listTechnicalProjects({ fetch: clients[0].request }),
+      () => projects.listRemoteProjects({ fetch: clients[0].request }),
       /Server Function rejected the request/,
       "logged-out session cannot access protected Server Functions",
     );
@@ -494,7 +567,7 @@ try {
     ]);
     assert.doesNotMatch(
       routeSources.join("\n"),
-      /technical-project-functions|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
+      /project-functions|RemoteProjectRepository|\.from\(["'](?:transactions|projects|import_profiles|import_runs)["']\)/,
       "product routes do not connect the technical remote vertical or financial tables",
     );
     assert.doesNotMatch(

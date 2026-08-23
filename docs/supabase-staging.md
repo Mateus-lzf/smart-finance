@@ -99,7 +99,7 @@ reconsidered before commercial/production exposure or broader staging access. `X
 
 The following commercial capabilities remain intentionally outside Sprint 15:
 
-- repository layer and remote financial persistence;
+- remaining remote financial repositories and activation of remote persistence in the product UI;
 - assisted migration of per-user and legacy local data;
 - atomic remote CSV/XLSX import and update;
 - separate production Supabase and Cloudflare environments;
@@ -112,6 +112,14 @@ The following commercial capabilities remain intentionally outside Sprint 15:
 
 Do not treat the existing technical `projects` table or remote RLS smoke fixtures as the product's
 financial source of truth.
+
+## Sprint 16 repository boundary
+
+Sprint 16A moved the current local persistence behind `FinancialRepository` without changing keys
+or stored data. Sprint 16B prepares a narrower, authenticated `ProjectRepository` implementation,
+Server Functions and optimistic concurrency behavior for future use. This infrastructure is not
+connected to the staging UI, was not deployed by Sprint 16B and does not mix remote Projects with
+local Transactions. The staging product continues to use only the per-user local workspace.
 
 ## Rollback rules
 

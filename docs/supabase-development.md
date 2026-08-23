@@ -1,8 +1,10 @@
 # Supabase local development
 
-Sprint 14A adds a local PostgreSQL/Supabase foundation. Sprint 14B1 adds a local authentication and
-server-session boundary without changing the financial data source. The application continues to
-use `localStorage` as its only source for projects and transactions.
+Sprint 14A adds a local PostgreSQL/Supabase foundation. Sprint 14B adds authentication and the
+server-session boundary. Sprint 16A introduces the financial persistence contract with the local
+adapter, and Sprint 16B prepares authenticated remote Project operations behind a separate,
+inactive repository. The application continues to use `LocalFinancialRepository` and
+`localStorage` as its only financial source.
 
 ## Prerequisites
 
@@ -20,6 +22,7 @@ bun run db:reset
 bun run db:test
 bun run db:lint
 bun run db:types
+bun run test:projects
 bun run test:auth
 bun run db:stop
 ```
@@ -73,8 +76,13 @@ cookie session -> TanStack Server Function -> Supabase client -> PostgreSQL RLS
 ```
 
 The test covers signup, local email confirmation through Mailpit, valid and invalid login, session
-validation, refresh, logout, anonymous/invalid-session rejection, and cross-user project isolation.
-The technical project Server Functions are not imported by any route or product UI.
+validation, refresh, logout, anonymous/invalid-session rejection, and symmetric cross-user Project
+isolation. It also exercises versioned create, read, update and delete through the same Project
+Server Functions prepared for future repositories. Those functions and `RemoteProjectRepository`
+are not imported by any route or by the financial product UI.
+
+`test:projects` is an offline contract/mapping test. It validates the domain/database mapper,
+repository error semantics and static security boundaries without contacting Supabase.
 
 ## Security boundary
 
@@ -203,9 +211,10 @@ Cloudflare Access was not configured because the Zero Trust Free onboarding requ
 method and no card was registered. This is not an application failure, but Access or an equivalent
 protection must be reconsidered before commercial/production exposure or broader staging access.
 
-The next product boundary is remote financial persistence. It requires a repository layer,
-ownership derived from the validated session, assisted and reversible migration of local data,
-atomic remote imports and explicit protection against duplicates. Production separation, domain,
+The Project-only remote infrastructure prepared in Sprint 16B is not a second financial source and
+does not activate remote persistence. Transactions, preferences, imports, assisted and reversible
+local-data migration, atomic remote imports and explicit protection against duplicates remain
+subsequent Sprint 16 checkpoints. Production separation, domain,
 SMTP, rate limiting, observability, backup/recovery, account export/deletion, LGPD operations,
 secret rotation and rollback remain additional commercial work. None of these capabilities was
 implemented by Sprint 15.
