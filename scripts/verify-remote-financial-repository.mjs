@@ -472,7 +472,7 @@ try {
     ]),
   ]);
   assert.doesNotMatch(source, /localStorage|LocalFinancialRepository|local-state-service/);
-  assert.match(appStore, /createLocalFinancialRepository\(userId\)/);
+  assert.match(appStore, /createFinancialRepositoryForMode/);
   assert.doesNotMatch(appStore, /createRemoteFinancialRepository|RemoteFinancialRepository/);
   assert.doesNotMatch(
     routeSources.join("\n"),

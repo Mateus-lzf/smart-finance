@@ -193,7 +193,7 @@ try {
     readFile("src/lib/workspace/workspace-functions.ts", "utf8"),
     readFile("supabase/migrations/202608240001_create_remote_workspace_metadata.sql", "utf8"),
   ]);
-  assert.match(appStore, /createLocalFinancialRepository\(userId\)/);
+  assert.match(appStore, /createFinancialRepositoryForMode/);
   assert.doesNotMatch(appStore, /RemoteWorkspace|ProjectPreferencesRepository|SupabaseRemote/);
   assert.doesNotMatch(localRepository, /Supabase|RemoteWorkspace|ProjectPreferencesRepository/);
   assert.doesNotMatch(functions, /user_id|owner_user_id/);

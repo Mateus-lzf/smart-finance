@@ -121,13 +121,17 @@ try {
     readFile("src/lib/imports/supabase-import-store.ts", "utf8"),
   ]);
   assert.match(routeSource, /userId=\{user\.id\}/, "the validated auth user scopes AppProvider");
-  assert.match(routeSource, /key=\{user\.id\}/, "account changes reset the financial provider");
+  assert.match(
+    routeSource,
+    /key=\{`\$\{user\.id\}:\$\{mode\}`\}/,
+    "account or mode changes reset the financial provider",
+  );
   assert.doesNotMatch(
     appStoreSource,
     /localStorage|getUserLocalStateKey|persistLocalState/,
     "AppProvider depends on the repository instead of local persistence details",
   );
-  assert.match(appStoreSource, /createLocalFinancialRepository\(userId\)/);
+  assert.match(appStoreSource, /createFinancialRepositoryForMode/);
   assert.match(localRepositorySource, /getUserLocalStateKey\(userId\)/);
   assert.doesNotMatch(
     appStoreSource,

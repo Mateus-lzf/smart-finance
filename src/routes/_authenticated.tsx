@@ -3,6 +3,8 @@ import { AppProvider } from "@/lib/app-store";
 import { AuthProvider, useAuth } from "@/lib/auth/auth-provider";
 import { getAuthState } from "@/lib/auth/auth-functions";
 import { sanitizeInternalRedirect } from "@/lib/auth/safe-redirect";
+import { getFinancialMode } from "@/lib/financial-mode-functions";
+import { FinancialStateGate } from "@/components/app/financial-state-gate";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -20,25 +22,28 @@ export const Route = createFileRoute("/_authenticated")({
         replace: true,
       });
     }
-    return { user: auth.user };
+    const { mode } = await getFinancialMode();
+    return { user: auth.user, financialMode: mode };
   },
   component: AuthenticatedApplication,
 });
 
 function AuthenticatedApplication() {
-  const { user } = Route.useRouteContext();
+  const { user, financialMode } = Route.useRouteContext();
   return (
     <AuthProvider initialUser={user}>
-      <AuthenticatedFinancialState />
+      <AuthenticatedFinancialState mode={financialMode} />
     </AuthProvider>
   );
 }
 
-function AuthenticatedFinancialState() {
+function AuthenticatedFinancialState({ mode }: { mode: "local" | "remote" }) {
   const { user } = useAuth();
   return (
-    <AppProvider key={user.id} userId={user.id}>
-      <Outlet />
+    <AppProvider key={`${user.id}:${mode}`} userId={user.id} mode={mode}>
+      <FinancialStateGate>
+        <Outlet />
+      </FinancialStateGate>
     </AppProvider>
   );
 }

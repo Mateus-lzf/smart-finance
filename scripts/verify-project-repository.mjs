@@ -90,7 +90,7 @@ try {
     readFile("src/lib/projects/supabase-project-store.ts", "utf8"),
     readFile("src/lib/projects/remote-project-repository.ts", "utf8"),
   ]);
-  assert.match(appStoreSource, /createLocalFinancialRepository\(userId\)/);
+  assert.match(appStoreSource, /createFinancialRepositoryForMode/);
   assert.doesNotMatch(appStoreSource, /RemoteProjectRepository|project-functions/);
   assert.match(functionsSource, /context\.user\.id/);
   assert.doesNotMatch(functionsSource, /owner_user_id/);

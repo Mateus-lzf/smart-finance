@@ -9,6 +9,7 @@ import {
   Plus,
   Menu,
   HardDrive,
+  Cloud,
   LogOut,
   UserRound,
 } from "lucide-react";
@@ -32,6 +33,7 @@ import { toast } from "sonner";
 
 function AccountSummary({ collapsed = false }: { collapsed?: boolean }) {
   const { user, logout, signingOut } = useAuth();
+  const { financialMode } = useApp();
 
   async function handleLogout() {
     const ok = await logout();
@@ -63,7 +65,15 @@ function AccountSummary({ collapsed = false }: { collapsed?: boolean }) {
             {user.email ?? "Conta Smart Finance"}
           </p>
           <p className="mt-0.5 flex items-center gap-1 text-[11px] text-sidebar-foreground/60">
-            <HardDrive className="size-3" /> Dados neste dispositivo
+            {financialMode === "remote" ? (
+              <>
+                <Cloud className="size-3" /> Dados sincronizados com a conta
+              </>
+            ) : (
+              <>
+                <HardDrive className="size-3" /> Dados neste dispositivo
+              </>
+            )}
           </p>
         </div>
         <button

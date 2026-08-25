@@ -140,6 +140,22 @@ npm run dev:staging
 The financial product UI still reads only AppStore and localStorage. Selecting the staging Auth
 endpoint does not migrate, upload, namespace, or dual-write projects and transactions.
 
+## Financial mode pilot configuration
+
+Sprint 16E-C prepares one financial source per authenticated session. The server resolves
+`local | remote` from `SMART_FINANCE_REMOTE_PILOT_USER_IDS`, a server-only comma-separated list of
+Supabase Auth user UUIDs. Missing, empty, malformed, duplicated or oversized configuration fails
+closed to `local`. The browser cannot choose or override the mode, and the variable must never use
+the `VITE_` prefix.
+
+For local verification, use only disposable users from the local Supabase instance in the ignored
+`.env.local` file. No identity is versioned. A remote session never reads or writes financial
+localStorage and never falls back to it after a network or authorization error. A local session
+continues to use the existing per-user local repository and performs no remote financial write.
+
+The staging example keeps the allowlist empty. Promoting the pending migrations and enabling a
+disposable staging pilot are separate, explicitly approved operations in Sprint 16E-D.
+
 ## Remote staging safety guard
 
 Checkpoint 15A prepares remote commands but does not create or link a project. The only supported

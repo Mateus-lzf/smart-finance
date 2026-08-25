@@ -165,7 +165,7 @@ try {
       readFile("src/lib/transactions/remote-transaction-repository.ts", "utf8"),
       readFile("supabase/migrations/202608220001_create_atomic_import_rpcs.sql", "utf8"),
     ]);
-  assert.match(appStoreSource, /createLocalFinancialRepository\(userId\)/);
+  assert.match(appStoreSource, /createFinancialRepositoryForMode/);
   assert.doesNotMatch(appStoreSource, /RemoteTransactionRepository|transaction-functions/);
   assert.match(functionsSource, /context\.user\.id/);
   assert.doesNotMatch(functionsSource, /owner_user_id|import_run_id|manually_modified/);

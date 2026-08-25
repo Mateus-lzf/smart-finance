@@ -23,6 +23,13 @@ No service-role, admin or database credential is part of the application runtime
 
 ## Ownership and environment decisions
 
+The financial-mode pilot allowlist is a server-only configuration named
+`SMART_FINANCE_REMOTE_PILOT_USER_IDS`. It remains empty by default and must not be exposed as a
+`VITE_` variable or contain a real identity in versioned files. Missing or invalid configuration
+selects local mode. Enabling a disposable staging account is deferred to Sprint 16E-D, after the
+pending database migrations and remote RLS/RPC validation. There is no automatic remote-to-local
+fallback and no dual-write.
+
 - The project must belong to the organization controlled by the Smart Finance owner.
 - The sole administrator must enable MFA before creating or linking the project.
 - Start on Supabase Free while staging is restricted to the owner.

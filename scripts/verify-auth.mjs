@@ -1050,7 +1050,7 @@ try {
     );
     assert.match(
       routeSources[0],
-      /<AppProvider key=\{user\.id\} userId=\{user\.id\}>/,
+      /<AppProvider key=\{`\$\{user\.id\}:\$\{mode\}`\} userId=\{user\.id\} mode=\{mode\}>/,
       "validated identity scopes the separate financial provider",
     );
     const authProviderSource = routeSources[2];
