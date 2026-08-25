@@ -172,9 +172,14 @@ try {
       amount: "amount",
     },
   };
-  const importedMutation = await repositoryA.importTransactions([imported], profile, {
-    mode: "create-project",
-    newProjectName: "Projeto importado",
+  const importedMutation = await repositoryA.importTransactions({
+    transactions: [imported],
+    profile,
+    destination: { mode: "create-project", newProjectName: "Projeto importado" },
+    file: { originalFilename: "dados.csv", fileHash: "a".repeat(64) },
+    idempotencyKey: "10000000-0000-4000-8000-000000000001",
+    confirmPossibleDuplicates: false,
+    confirmManualOverwrite: false,
   });
   const importedProjectId = importedMutation.result.id;
   assert.equal(importedMutation.workspace.transactionsByProject[importedProjectId][0].amount, 900);
@@ -190,10 +195,16 @@ try {
   ]);
   assert.deepEqual(workspace.analyticDimensionsByProject[importedProjectId], ["column:filial:1"]);
 
+  await repositoryA.createTransaction(importedProjectId, manual);
   const updatedImported = { ...imported, amount: 950 };
-  const updatedMutation = await repositoryA.importTransactions([updatedImported, manual], profile, {
-    mode: "replace-project",
-    targetProjectId: importedProjectId,
+  const updatedMutation = await repositoryA.importTransactions({
+    transactions: [updatedImported],
+    profile,
+    destination: { mode: "replace-project", targetProjectId: importedProjectId },
+    file: { originalFilename: "dados-2.csv", fileHash: "b".repeat(64) },
+    idempotencyKey: "10000000-0000-4000-8000-000000000002",
+    confirmPossibleDuplicates: false,
+    confirmManualOverwrite: false,
   });
   assert.equal(updatedMutation.workspace.transactionsByProject[importedProjectId].length, 2);
   assert.equal(updatedMutation.workspace.transactionsByProject[importedProjectId][0].amount, 950);

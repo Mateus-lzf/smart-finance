@@ -85,6 +85,11 @@ export async function readImportFile(file: File): Promise<ImportPreview> {
   if (!isSupportedImportFile(file)) {
     throw new Error("Formato inválido. Selecione um arquivo CSV ou XLSX.");
   }
+  const fileHash = Array.from(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())),
+  )
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
   let matrix: unknown[][];
   if (extension === "csv") matrix = parseCsv(await file.text());
   else matrix = await readSheet(file);
@@ -110,6 +115,8 @@ export async function readImportFile(file: File): Promise<ImportPreview> {
   const mapping = detectMapping(columns);
   return {
     fileName: file.name,
+    fileHash,
+    idempotencyKey: crypto.randomUUID(),
     headers,
     columns,
     rows,

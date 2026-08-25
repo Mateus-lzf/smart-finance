@@ -78,11 +78,15 @@ function ImportPage() {
       setMapping(null);
       setStep(2);
       setStep(3);
-      await commitImportedTransactions(
-        rows,
-        { headers: parsed.headers, columns: parsed.columns, mapping: selectedMapping },
-        { mode: "create-project", newProjectName },
-      );
+      await commitImportedTransactions({
+        transactions: rows,
+        profile: { headers: parsed.headers, columns: parsed.columns, mapping: selectedMapping },
+        destination: { mode: "create-project", newProjectName },
+        file: { originalFilename: parsed.fileName, fileHash: parsed.fileHash },
+        idempotencyKey: parsed.idempotencyKey,
+        confirmPossibleDuplicates: duplicatesConfirmed,
+        confirmManualOverwrite: false,
+      });
       setStep(4);
       setStep(steps.length);
       await navigate({ to: "/dashboard" });

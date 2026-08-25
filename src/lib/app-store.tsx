@@ -10,7 +10,7 @@ import {
 import type {
   FinancialRepository,
   FinancialWorkspace,
-  ImportDestination,
+  FinancialImportCommand,
 } from "./financial-repository";
 import { DEFAULT_VISIBLE_COLUMNS, emptyFinancialWorkspace } from "./financial-repository";
 import type { ImportProfile, Project, ProjectInput, Transaction } from "./finance-types";
@@ -30,11 +30,7 @@ type AppState = {
   setVisibleColumns: (columns: string[]) => Promise<void>;
   analyticDimensions: string[];
   setAnalyticDimensions: (columns: string[]) => Promise<void>;
-  commitImportedTransactions: (
-    rows: Transaction[],
-    profile: ImportProfile,
-    destination: ImportDestination,
-  ) => Promise<Project>;
+  commitImportedTransactions: (command: FinancialImportCommand) => Promise<Project>;
   onboarded: boolean;
   setOnboarded: (value: boolean) => void;
   aiOpen: boolean;
@@ -134,8 +130,8 @@ export function AppProvider({
     [applyWorkspace, repository, workspace.activeProjectId],
   );
   const commitImportedTransactions = useCallback(
-    async (rows: Transaction[], profile: ImportProfile, destination: ImportDestination) => {
-      const mutation = await repository.importTransactions(rows, profile, destination);
+    async (command: FinancialImportCommand) => {
+      const mutation = await repository.importTransactions(command);
       applyWorkspace(mutation.workspace);
       return mutation.result;
     },

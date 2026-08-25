@@ -1,7 +1,7 @@
 import type {
   FinancialRepository,
   FinancialWorkspace,
-  ImportDestination,
+  FinancialImportCommand,
   ProjectPreferencesPatch,
   WorkspaceMutation,
 } from "./financial-repository";
@@ -20,6 +20,7 @@ import {
   deleteLocalTransaction,
   updateLocalTransaction,
 } from "./transaction-service";
+import { compareTransactionUpdates } from "./transaction-update-service";
 
 type LocalStoragePort = Pick<Storage, "getItem" | "setItem">;
 
@@ -140,11 +141,8 @@ export class LocalFinancialRepository implements FinancialRepository {
     );
   }
 
-  async importTransactions(
-    transactions: Transaction[],
-    profile: ImportProfile,
-    destination: ImportDestination,
-  ): Promise<WorkspaceMutation<Project>> {
+  async importTransactions(command: FinancialImportCommand): Promise<WorkspaceMutation<Project>> {
+    const { transactions, profile, destination } = command;
     let importedProject!: Project;
     const workspace = await this.mutate((current) => {
       const existingId =
@@ -158,6 +156,10 @@ export class LocalFinancialRepository implements FinancialRepository {
       }
       if (created && !created.name) throw new Error("Informe o nome do novo projeto.");
       const projectId = existingId ?? created!.id;
+      const nextTransactions = existingId
+        ? compareTransactionUpdates(current.transactionsByProject[projectId] ?? [], transactions)
+            .nextTransactions
+        : transactions;
       const now = new Date().toISOString();
       const projects = created
         ? [...current.projects, created]
@@ -168,7 +170,7 @@ export class LocalFinancialRepository implements FinancialRepository {
       return {
         projects,
         activeProjectId: projectId,
-        transactionsByProject: { ...current.transactionsByProject, [projectId]: transactions },
+        transactionsByProject: { ...current.transactionsByProject, [projectId]: nextTransactions },
         importProfilesByProject: { ...current.importProfilesByProject, [projectId]: profile },
         visibleColumnsByProject: {
           ...current.visibleColumnsByProject,

@@ -71,6 +71,11 @@ try {
   ].join("\n");
   const csvPreview = await importer.readImportFile(new File([csv], "dados.csv"));
   assert.deepEqual(csvPreview.missingFields, []);
+  assert.match(csvPreview.fileHash, /^[a-f0-9]{64}$/);
+  assert.match(
+    csvPreview.idempotencyKey,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  );
   const csvRows = importer.normalizeImportedRows(csvPreview);
   assert.equal(csvRows[0].date, "2026-07-01");
   assert.equal(calendarDate.formatCalendarDate(csvRows[0].date), "01/07/2026");

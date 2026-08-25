@@ -55,6 +55,8 @@ export type RawImportRow = Record<string, unknown>;
 
 export type ImportPreview = {
   fileName: string;
+  fileHash: string;
+  idempotencyKey: string;
   headers: string[];
   columns: ImportedColumn[];
   rows: RawImportRow[];

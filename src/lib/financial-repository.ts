@@ -20,6 +20,30 @@ export type ImportDestination =
   | { mode: "replace-project"; targetProjectId: string }
   | { mode: "create-project"; newProjectName: string };
 
+export type FinancialImportCommand = {
+  transactions: Transaction[];
+  profile: ImportProfile;
+  destination: ImportDestination;
+  file: { originalFilename: string; fileHash: string };
+  idempotencyKey: string;
+  confirmPossibleDuplicates: boolean;
+  confirmManualOverwrite: boolean;
+};
+
+export type FinancialRepositoryErrorCode =
+  "UNAUTHORIZED" | "NOT_FOUND" | "CONFLICT" | "VALIDATION" | "LIMIT_EXCEEDED" | "UNAVAILABLE";
+
+export class FinancialRepositoryError extends Error {
+  constructor(
+    public readonly code: FinancialRepositoryErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "FinancialRepositoryError";
+  }
+}
+
 export type WorkspaceMutation<T = void> = {
   workspace: FinancialWorkspace;
   result: T;
@@ -38,11 +62,7 @@ export interface FinancialRepository {
     patch: Partial<Transaction>,
   ): Promise<FinancialWorkspace>;
   deleteTransaction(projectId: string, transactionId: string): Promise<FinancialWorkspace>;
-  importTransactions(
-    transactions: Transaction[],
-    profile: ImportProfile,
-    destination: ImportDestination,
-  ): Promise<WorkspaceMutation<Project>>;
+  importTransactions(command: FinancialImportCommand): Promise<WorkspaceMutation<Project>>;
   updateProjectPreferences(
     projectId: string,
     patch: ProjectPreferencesPatch,

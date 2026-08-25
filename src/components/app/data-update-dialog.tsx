@@ -85,11 +85,15 @@ export function DataUpdateDialog() {
     if (!comparison || !preview || !mapping || !project) return;
     setLoading(true);
     try {
-      await commitImportedTransactions(
-        comparison.nextTransactions,
-        { headers: preview.headers, columns: preview.columns, mapping },
-        { mode: "replace-project", targetProjectId: project.id },
-      );
+      await commitImportedTransactions({
+        transactions: normalizeImportedRows(preview, mapping),
+        profile: { headers: preview.headers, columns: preview.columns, mapping },
+        destination: { mode: "replace-project", targetProjectId: project.id },
+        file: { originalFilename: preview.fileName, fileHash: preview.fileHash },
+        idempotencyKey: preview.idempotencyKey,
+        confirmPossibleDuplicates: comparison.possibleDuplicates.length > 0,
+        confirmManualOverwrite: comparison.manualEditsOverwritten.length > 0,
+      });
       setOpen(false);
       reset();
     } catch (cause) {
