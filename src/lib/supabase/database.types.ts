@@ -134,6 +134,7 @@ export type Database = {
           project_id: string;
           updated_at: string;
           user_id: string;
+          version: number;
           visible_columns: Json;
         };
         Insert: {
@@ -142,6 +143,7 @@ export type Database = {
           project_id: string;
           updated_at?: string;
           user_id: string;
+          version?: number;
           visible_columns?: Json;
         };
         Update: {
@@ -150,6 +152,7 @@ export type Database = {
           project_id?: string;
           updated_at?: string;
           user_id?: string;
+          version?: number;
           visible_columns?: Json;
         };
         Relationships: [
@@ -341,6 +344,7 @@ export type Database = {
         };
         Returns: boolean;
       };
+      load_financial_workspace: { Args: never; Returns: Json };
       update_financial_transaction: {
         Args: {
           p_expected_version: number;
@@ -368,6 +372,29 @@ export type Database = {
         SetofOptions: {
           from: "*";
           to: "transactions";
+          isOneToOne: false;
+          isSetofReturn: true;
+        };
+      };
+      update_project_preferences: {
+        Args: {
+          p_analytical_dimensions: Json;
+          p_expected_version: number;
+          p_project_id: string;
+          p_visible_columns: Json;
+        };
+        Returns: {
+          analytical_dimensions: Json;
+          created_at: string;
+          project_id: string;
+          updated_at: string;
+          user_id: string;
+          version: number;
+          visible_columns: Json;
+        }[];
+        SetofOptions: {
+          from: "*";
+          to: "project_preferences";
           isOneToOne: false;
           isSetofReturn: true;
         };
