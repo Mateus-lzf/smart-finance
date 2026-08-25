@@ -19,6 +19,7 @@
     "test:auth:navigation": "node scripts/verify-auth-navigation.mjs",
     "test:staging:guard": "node scripts/verify-staging-guard.mjs",
     "test:staging": "node scripts/verify-staging-auth.mjs",
+    "test:staging:financial": "node scripts/verify-staging-financial.mjs",
     "test:cloudflare:staging": "node scripts/verify-cloudflare-staging.mjs",
     "test:isolation": "node scripts/verify-user-isolation.mjs",
     "test:repository": "node scripts/verify-local-repository.mjs",
