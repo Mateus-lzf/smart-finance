@@ -10,8 +10,8 @@ export function validateCloudflareConfig(config) {
   if (config.name !== "smart-finance") {
     throw new Error("The base Worker name must be exactly smart-finance.");
   }
-  if (config.main !== ".output/server/index.mjs") {
-    throw new Error("Wrangler must deploy the Nitro Cloudflare module entrypoint.");
+  if (config.main !== "src/cloudflare-worker.mjs") {
+    throw new Error("Wrangler must deploy the reviewed Cloudflare staging wrapper entrypoint.");
   }
   if (config.workers_dev !== false || config.preview_urls !== false) {
     throw new Error("The base Worker must not expose workers.dev or preview URLs.");
@@ -46,6 +46,13 @@ export function validateCloudflareConfig(config) {
   }
   if (config.assets?.directory !== ".output/public" || config.assets?.binding !== "ASSETS") {
     throw new Error("Wrangler static assets must point to the Nitro public output.");
+  }
+  if (
+    !Array.isArray(config.assets?.run_worker_first) ||
+    config.assets.run_worker_first.length !== 1 ||
+    config.assets.run_worker_first[0] !== "/robots.txt"
+  ) {
+    throw new Error("Only /robots.txt must run through the staging Worker before static assets.");
   }
   if (!(config.compatibility_flags ?? []).includes("nodejs_compat")) {
     throw new Error("The current Nitro output requires nodejs_compat.");

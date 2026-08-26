@@ -17,6 +17,7 @@ assert.match(runtimeConfig.supabasePublishableKey, /^sb_publishable_/);
 assert.equal(config.preview_urls, false);
 assert.equal(config.env.staging.preview_urls, false);
 assert.equal(config.env.production, undefined);
+assert.deepEqual(config.assets.run_worker_first, ["/robots.txt"]);
 
 const identity = {
   SMART_FINANCE_CLOUDFLARE_ENVIRONMENT: "staging",
@@ -40,6 +41,7 @@ assert.throws(() =>
 assert.throws(() =>
   validateCloudflareConfig({ ...config, env: { ...config.env, production: {} } }),
 );
+assert.throws(() => validateCloudflareConfig({ ...config, main: ".output/server/index.mjs" }));
 assert.throws(() =>
   validateCloudflareConfig({
     ...config,
@@ -99,6 +101,14 @@ const serverSource = await readFile("src/server.ts", "utf8");
 assert.match(serverSource, /SMART_FINANCE_ENVIRONMENT/);
 assert.match(serverSource, /X-Robots-Tag/);
 assert.ok(serverSource.includes("Disallow: /\\n"));
+
+const cloudflareWorkerSource = await readFile("src/cloudflare-worker.mjs", "utf8");
+assert.match(cloudflareWorkerSource, /\.\.\/\.output\/server\/index\.mjs/);
+assert.match(cloudflareWorkerSource, /SMART_FINANCE_ENVIRONMENT/);
+assert.match(cloudflareWorkerSource, /X-Robots-Tag/);
+assert.match(cloudflareWorkerSource, /noindex, nofollow, noarchive/);
+assert.ok(cloudflareWorkerSource.includes('pathname !== "/robots.txt"'));
+assert.ok(cloudflareWorkerSource.includes("Disallow: /\\n"));
 
 const browserClientSource = await readFile("src/lib/supabase/browser-client.ts", "utf8");
 const serverClientSource = await readFile("src/lib/supabase/server-client.ts", "utf8");
