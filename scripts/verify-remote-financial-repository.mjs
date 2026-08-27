@@ -312,6 +312,24 @@ try {
   assert.deepEqual(workspace.analyticDimensionsByProject[projectId], []);
   assert.equal(workspace.importProfilesByProject[projectId], undefined);
 
+  const secondProjectId = (await a.repository.createProject({ name: "Projeto selecionado" })).result
+    .id;
+  await a.repository.selectProject(secondProjectId);
+  const refreshedRepository = new remoteModule.RemoteFinancialRepository(a.dependencies);
+  const refreshedWorkspace = await refreshedRepository.loadWorkspace();
+  assert.notEqual(
+    refreshedWorkspace.activeProjectId,
+    secondProjectId,
+    "a fresh remote repository has no device selection before restoration",
+  );
+  const restoredWorkspace = await refreshedRepository.selectProject(secondProjectId);
+  assert.equal(restoredWorkspace.activeProjectId, secondProjectId);
+  assert.deepEqual(
+    restoredWorkspace.visibleColumnsByProject[projectId],
+    [],
+    "restoring another active project does not change persisted column preferences",
+  );
+
   const importCommand = {
     transactions: [
       { ...manual, id: "import-1", origin: "imported", description: "Duplicada" },

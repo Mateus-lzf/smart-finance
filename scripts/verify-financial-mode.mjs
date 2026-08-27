@@ -10,6 +10,7 @@ const vite = await createServer({ server: { middlewareMode: true }, appType: "cu
 try {
   const modeModule = await vite.ssrLoadModule("/src/lib/financial-mode.server.ts");
   const factoryModule = await vite.ssrLoadModule("/src/lib/financial-repository-factory.ts");
+  const activeProjectModule = await vite.ssrLoadModule("/src/lib/active-project-preference.ts");
 
   assert.equal(modeModule.resolveFinancialModeForUser(userA, undefined), "local");
   assert.equal(modeModule.resolveFinancialModeForUser(userA, ""), "local");
@@ -59,6 +60,18 @@ try {
   );
   assert.equal(localFallbackCalls, 0, "remote failures never fall back to local persistence");
 
+  const preferenceStorage = new Map();
+  const storage = {
+    getItem: (key) => preferenceStorage.get(key) ?? null,
+    setItem: (key, value) => preferenceStorage.set(key, value),
+    removeItem: (key) => preferenceStorage.delete(key),
+  };
+  activeProjectModule.persistActiveProjectPreference(storage, userA, "project-second");
+  assert.equal(activeProjectModule.loadActiveProjectPreference(storage, userA), "project-second");
+  assert.equal(activeProjectModule.loadActiveProjectPreference(storage, userB), null);
+  activeProjectModule.persistActiveProjectPreference(storage, userA, null);
+  assert.equal(activeProjectModule.loadActiveProjectPreference(storage, userA), null);
+
   const [route, appStore, gate, modeFunctions, factory, localRepositorySource] = await Promise.all([
     readFile("src/routes/_authenticated.tsx", "utf8"),
     readFile("src/lib/app-store.tsx", "utf8"),
@@ -78,6 +91,8 @@ try {
   assert.match(appStore, /createFinancialRepositoryForMode/);
   assert.doesNotMatch(appStore, /createLocalFinancialRepository|localStorage/);
   assert.match(appStore, /setWorkspace\(emptyFinancialWorkspace\(\)\)/);
+  assert.match(appStore, /applyRemoteActiveProjectPreference/);
+  assert.match(appStore, /createBrowserActiveProjectPreference/);
   assert.match(appStore, /error\.code === "CONFLICT"/);
   assert.match(factory, /mode === "remote" \? factories\.remote\(\) :/);
   assert.doesNotMatch(factory, /catch\(|fallback/i);

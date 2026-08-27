@@ -20,6 +20,7 @@ import {
 import type { ImportProfile, Project, ProjectInput, Transaction } from "./finance-types";
 import type { FinancialMode } from "./financial-mode";
 import { createFinancialRepositoryForMode } from "./financial-repository-factory";
+import { createBrowserActiveProjectPreference } from "./active-project-preference";
 
 export type FinancialStatus = "initializing" | "ready" | "error" | "unauthorized";
 
@@ -78,11 +79,36 @@ export function AppProvider({
   const [financialStatus, setFinancialStatus] = useState<FinancialStatus>("initializing");
   const [financialError, setFinancialError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const activeProjectPreference = useMemo(
+    () => (mode === "remote" ? createBrowserActiveProjectPreference(userId) : null),
+    [mode, userId],
+  );
 
   const applyWorkspace = useCallback((next: FinancialWorkspace) => {
     setWorkspace(next);
     setOnboarded(next.projects.length > 0);
   }, []);
+
+  const applyRemoteActiveProjectPreference = useCallback(
+    async (currentRepository: FinancialRepository, next: FinancialWorkspace) => {
+      if (!activeProjectPreference) return next;
+      const persistedProjectId = activeProjectPreference.load();
+      return persistedProjectId &&
+        persistedProjectId !== next.activeProjectId &&
+        next.projects.some((project) => project.id === persistedProjectId)
+        ? currentRepository.selectProject(persistedProjectId)
+        : next;
+    },
+    [activeProjectPreference],
+  );
+
+  const applyWorkspaceAndPreference = useCallback(
+    (next: FinancialWorkspace) => {
+      activeProjectPreference?.persist(next.activeProjectId);
+      applyWorkspace(next);
+    },
+    [activeProjectPreference, applyWorkspace],
+  );
 
   useEffect(() => {
     let active = true;
@@ -97,9 +123,12 @@ export function AppProvider({
       .then(async (nextRepository) => {
         if (!active) return;
         setRepository(nextRepository);
-        const next = await nextRepository.loadWorkspace();
+        const next = await applyRemoteActiveProjectPreference(
+          nextRepository,
+          await nextRepository.loadWorkspace(),
+        );
         if (active) {
-          applyWorkspace(next);
+          applyWorkspaceAndPreference(next);
           setFinancialStatus("ready");
           setHydrated(true);
         }
@@ -121,7 +150,15 @@ export function AppProvider({
     return () => {
       active = false;
     };
-  }, [applyWorkspace, injectedRepository, loadAttempt, mode, repositoryFactory, userId]);
+  }, [
+    applyRemoteActiveProjectPreference,
+    applyWorkspaceAndPreference,
+    injectedRepository,
+    loadAttempt,
+    mode,
+    repositoryFactory,
+    userId,
+  ]);
 
   const retryFinancialWorkspace = useCallback(async () => {
     setLoadAttempt((attempt) => attempt + 1);
@@ -147,7 +184,7 @@ export function AppProvider({
       } catch (error) {
         if (error instanceof FinancialRepositoryError && error.code === "CONFLICT") {
           try {
-            applyWorkspace(await currentRepository.loadWorkspace());
+            applyWorkspaceAndPreference(await currentRepository.loadWorkspace());
           } catch (reloadError) {
             setWorkspace(emptyFinancialWorkspace());
             setOnboarded(false);
@@ -173,34 +210,36 @@ export function AppProvider({
         throw error;
       }
     },
-    [applyWorkspace, requireRepository],
+    [applyWorkspaceAndPreference, requireRepository],
   );
 
   const setProjectId = useCallback(
-    async (id: string) => applyWorkspace(await runMutation((current) => current.selectProject(id))),
-    [applyWorkspace, runMutation],
+    async (id: string) =>
+      applyWorkspaceAndPreference(await runMutation((current) => current.selectProject(id))),
+    [applyWorkspaceAndPreference, runMutation],
   );
   const createProject = useCallback(
     async (input: ProjectInput) => {
       const mutation = await runMutation((current) => current.createProject(input));
-      applyWorkspace(mutation.workspace);
+      applyWorkspaceAndPreference(mutation.workspace);
       return mutation.result;
     },
-    [applyWorkspace, runMutation],
+    [applyWorkspaceAndPreference, runMutation],
   );
   const updateProject = useCallback(
     async (id: string, input: ProjectInput) =>
-      applyWorkspace(await runMutation((current) => current.updateProject(id, input))),
-    [applyWorkspace, runMutation],
+      applyWorkspaceAndPreference(await runMutation((current) => current.updateProject(id, input))),
+    [applyWorkspaceAndPreference, runMutation],
   );
   const deleteProject = useCallback(
-    async (id: string) => applyWorkspace(await runMutation((current) => current.deleteProject(id))),
-    [applyWorkspace, runMutation],
+    async (id: string) =>
+      applyWorkspaceAndPreference(await runMutation((current) => current.deleteProject(id))),
+    [applyWorkspaceAndPreference, runMutation],
   );
   const setVisibleColumns = useCallback(
     async (columns: string[]) => {
       if (!workspace.activeProjectId) return;
-      applyWorkspace(
+      applyWorkspaceAndPreference(
         await runMutation((current) =>
           current.updateProjectPreferences(workspace.activeProjectId!, {
             visibleColumns: columns,
@@ -208,12 +247,12 @@ export function AppProvider({
         ),
       );
     },
-    [applyWorkspace, runMutation, workspace.activeProjectId],
+    [applyWorkspaceAndPreference, runMutation, workspace.activeProjectId],
   );
   const setAnalyticDimensions = useCallback(
     async (columns: string[]) => {
       if (!workspace.activeProjectId) return;
-      applyWorkspace(
+      applyWorkspaceAndPreference(
         await runMutation((current) =>
           current.updateProjectPreferences(workspace.activeProjectId!, {
             analyticDimensions: columns,
@@ -221,44 +260,44 @@ export function AppProvider({
         ),
       );
     },
-    [applyWorkspace, runMutation, workspace.activeProjectId],
+    [applyWorkspaceAndPreference, runMutation, workspace.activeProjectId],
   );
   const commitImportedTransactions = useCallback(
     async (command: FinancialImportCommand) => {
       const mutation = await runMutation((current) => current.importTransactions(command));
-      applyWorkspace(mutation.workspace);
+      applyWorkspaceAndPreference(mutation.workspace);
       return mutation.result;
     },
-    [applyWorkspace, runMutation],
+    [applyWorkspaceAndPreference, runMutation],
   );
   const updateTransaction = useCallback(
     async (id: string, patch: Partial<Transaction>) => {
       if (!workspace.activeProjectId) throw new Error("Selecione um projeto para continuar.");
-      applyWorkspace(
+      applyWorkspaceAndPreference(
         await runMutation((current) =>
           current.updateTransaction(workspace.activeProjectId!, id, patch),
         ),
       );
     },
-    [applyWorkspace, runMutation, workspace.activeProjectId],
+    [applyWorkspaceAndPreference, runMutation, workspace.activeProjectId],
   );
   const addTransaction = useCallback(
     async (row: Transaction) => {
       if (!workspace.activeProjectId) throw new Error("Selecione um projeto para continuar.");
-      applyWorkspace(
+      applyWorkspaceAndPreference(
         await runMutation((current) => current.createTransaction(workspace.activeProjectId!, row)),
       );
     },
-    [applyWorkspace, runMutation, workspace.activeProjectId],
+    [applyWorkspaceAndPreference, runMutation, workspace.activeProjectId],
   );
   const deleteTransaction = useCallback(
     async (id: string) => {
       if (!workspace.activeProjectId) throw new Error("Selecione um projeto para continuar.");
-      applyWorkspace(
+      applyWorkspaceAndPreference(
         await runMutation((current) => current.deleteTransaction(workspace.activeProjectId!, id)),
       );
     },
-    [applyWorkspace, runMutation, workspace.activeProjectId],
+    [applyWorkspaceAndPreference, runMutation, workspace.activeProjectId],
   );
 
   const getProjectTransactions = useCallback(
