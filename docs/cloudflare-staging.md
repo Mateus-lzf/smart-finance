@@ -78,8 +78,10 @@ The following evidence closed the application-runtime portion of Checkpoint 15D-
   `/dashboard`, authenticated session, refresh, logout, anonymous-route rejection, canonical
   post-login navigation and password recovery/reset/login passed over HTTPS.
 
-The financial UI still uses per-user localStorage. The deployed Worker does not read, migrate or
-dual-write product projects and transactions to Supabase.
+Sprint 16E subsequently enabled one disposable remote financial pilot through the server-only
+allowlist. That session uses only `RemoteFinancialRepository`; non-allowlisted sessions continue to
+use their per-user local workspace. The Worker does not migrate or dual-write local data, and a
+remote failure never falls back to a local workspace.
 
 ## Security before first deploy
 
@@ -103,7 +105,20 @@ external state and is not recorded in Git. Production requires its own documente
 
 ## Commercial gaps after Sprint 15
 
-This staging deployment is not a production launch. Remote financial persistence, assisted local
-data migration, atomic remote imports, production environments, domain, SMTP, rate limiting,
-observability, backups, account export/deletion, LGPD operations, secret rotation and production
-rollback remain future work.
+This staging deployment is not a production launch. The controlled remote pilot and atomic remote
+imports passed Sprint 16E acceptance, but assisted local-data migration remains Sprint 16F.
+Production environments, domain, SMTP, rate limiting, observability, backups, account
+export/deletion, LGPD operations, secret rotation and production rollback remain future work.
+
+## Sprint 16E remote pilot acceptance
+
+Sprint 16E-D6 and Sprint 16E are **CLOSED with PASS**. Automated repository, mode-selection and
+staging financial matrices were complemented by manual HTTPS validation of Project/Transaction
+CRUD, CSV/XLSX import and reimport, concurrency conflicts, remote preferences, refresh, offline
+failure without local fallback and synchronization across browsers and devices. No financial
+workspace was written to `localStorage`, and no dual-write occurred.
+
+The active-Project refresh bug found during acceptance was fixed in commit `5a03169` and manually
+retested with PASS. Active selection is a per-user, per-device UI preference; financial data and
+Project preferences remain remote. The pilot continues to be controlled exclusively by the
+server-side allowlist, with no real identity stored in Git.

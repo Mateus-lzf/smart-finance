@@ -1,9 +1,10 @@
 # Supabase staging runbook
 
-This runbook records the staging environment delivered by Sprint 15 without making it a financial
-data source. **Sprint 15 is CLOSED. Cloudflare Access is consciously deferred and documented;
-Cloudflare Access is not complete.** Projects and transactions displayed by the product still come
-exclusively from the per-user local AppStore/localStorage state.
+This runbook records the staging environment that Sprint 15 originally delivered without making it
+a financial data source. **Sprint 15 is CLOSED. Cloudflare Access is consciously deferred and documented;
+Cloudflare Access is not complete.** Sprint 16E subsequently enabled one disposable remote pilot
+behind a server-only allowlist. Accounts outside that allowlist continue to use their isolated local
+workspace.
 
 ## Sprint 15 closure status
 
@@ -26,9 +27,8 @@ No service-role, admin or database credential is part of the application runtime
 The financial-mode pilot allowlist is a server-only configuration named
 `SMART_FINANCE_REMOTE_PILOT_USER_IDS`. It remains empty by default and must not be exposed as a
 `VITE_` variable or contain a real identity in versioned files. Missing or invalid configuration
-selects local mode. Enabling a disposable staging account is deferred to Sprint 16E-D, after the
-pending database migrations and remote RLS/RPC validation. There is no automatic remote-to-local
-fallback and no dual-write.
+selects local mode. Sprint 16E-D enabled one disposable staging account only after migration review
+and remote RLS/RPC validation. There is no automatic remote-to-local fallback and no dual-write.
 
 - The project must belong to the organization controlled by the Smart Finance owner.
 - The sole administrator must enable MFA before creating or linking the project.
@@ -89,8 +89,9 @@ against production.
 - Confirm the financial localStorage value is unchanged before and after the journey.
 
 The deployed runtime passed signup confirmation, PKCE callback, session refresh, logout, anonymous
-route protection and password recovery/reset manual checks. The financial UI remained local and was
-not connected or dual-written to PostgreSQL.
+route protection and password recovery/reset manual checks. At Sprint 15 closure the financial UI
+remained local and was not connected or dual-written to PostgreSQL; Sprint 16E later added the
+allowlist-controlled remote pilot described below.
 
 ## Cloudflare Access decision
 
@@ -106,9 +107,7 @@ reconsidered before commercial/production exposure or broader staging access. `X
 
 The following commercial capabilities remain intentionally outside Sprint 15:
 
-- remaining remote financial repositories and activation of remote persistence in the product UI;
 - assisted migration of per-user and legacy local data;
-- atomic remote CSV/XLSX import and update;
 - separate production Supabase and Cloudflare environments;
 - permanent domain and transactional SMTP;
 - rate limiting, production observability and alerting;
@@ -122,14 +121,38 @@ financial source of truth.
 
 ## Sprint 16 repository boundary
 
-Sprint 16A moved the current local persistence behind `FinancialRepository` without changing keys
-or stored data. Sprint 16B prepares a narrower, authenticated `ProjectRepository` implementation,
-Server Functions and optimistic concurrency behavior for future use. Sprint 16C adds a separate
-`TransactionRepository` for versioned, unitary CRUD while leaving remote import/update operations
-for an atomic checkpoint. Sprint 16D implements that checkpoint locally with transactional,
-idempotent RPCs and a separate inactive `ImportRepository`. None of the Sprint 16B-16D
-infrastructure is connected to the staging UI or deployed by these checkpoints. The staging
-product continues to use only the per-user local workspace.
+Sprint 16A moved local persistence behind `FinancialRepository` without changing existing keys or
+stored data. Sprint 16B added authenticated remote Projects; 16C added versioned Transactions; 16D
+added transactional, idempotent import RPCs; and 16E composed a coherent remote snapshot,
+preferences and `RemoteFinancialRepository`. The server now assigns exactly one source per session.
+Local remains the default, while only allowlisted staging pilots receive remote mode.
+
+## Sprint 16E-D6 acceptance and closure
+
+Sprint 16E-D6 and Sprint 16E are **CLOSED with PASS**. No known functional blocker remains.
+
+- **Automated evidence:** repository and financial-mode suites plus the staging financial matrix
+  validate authenticated ownership, symmetric A/B isolation, Project/Transaction concurrency,
+  workspace snapshots, versioned preferences, atomic imports, idempotency and cleanup of technical
+  fixtures. No privileged credential is used by application operations.
+- **Manual staging evidence:** the pilot validated Project and Transaction CRUD, refresh, a second
+  browser and mobile access, conflict detection without silent overwrite, CSV/XLSX import and
+  reimport, legitimate duplicate occurrences, manual-row preservation and overwrite confirmation
+  for manually edited imported rows. A near-identical changed row was not incorrectly classified as
+  a duplicate. Dashboard, Data, Insights and Reports reconciled to the same remote source; search,
+  filters, visible columns, deletion/cancellation, report CSV and printing also passed.
+- **Source isolation evidence:** offline use did not fall back to a local workspace, reconnecting
+  restored the remote workspace, and inspection found no financial workspace in `localStorage`.
+  Remote mode does not dual-write. Accounts outside the server allowlist remain local.
+- **Preferences evidence:** visible columns persisted after refresh and across devices. The
+  `activeProjectId` refresh defect was corrected in commit `5a03169` and manually retested with PASS.
+  Active Project selection is intentionally a per-device interface preference and may differ across
+  devices.
+
+There was no automatic migration of existing users or local data. Sprint 16F is next and will cover
+assisted local-to-remote migration with detection, preview, confirmation, ID conversion,
+idempotency, reconciliation, backup/rollback and explicit treatment of the unattributed global
+legacy key. Sprint 16F has not started.
 
 ## Rollback rules
 

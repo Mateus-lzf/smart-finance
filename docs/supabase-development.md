@@ -5,8 +5,10 @@ server-session boundary. Sprint 16A introduces the financial persistence contrac
 adapter, and Sprint 16B prepares authenticated remote Project operations behind a separate,
 inactive repository. Sprint 16C adds an equally inactive, versioned Transaction repository for
 unitary CRUD. Sprint 16D adds an inactive `ImportRepository` and transactional PostgreSQL RPCs for
-idempotent initial imports and updates. The application continues to use
-`LocalFinancialRepository` and `localStorage` as its only financial source.
+idempotent initial imports and updates. Sprint 16E composes those boundaries into a complete
+`RemoteFinancialRepository` and closes the controlled staging pilot. Each authenticated session
+uses exactly one financial source: `LocalFinancialRepository` by default or
+`RemoteFinancialRepository` only when selected by the server-side pilot allowlist.
 
 ## Prerequisites
 
@@ -112,11 +114,12 @@ not accepted as authority from client input.
 
 The browser client is the SSR-compatible user-session client. Sprint 14B2 completed the Auth UI,
 server-aware route protection, PKCE callbacks, password recovery and logout. It remains separate
-from the financial AppStore. Repositories, remote financial persistence and assisted local-data
-migration remain future work.
+from the financial AppStore. Remote financial persistence is available only to the controlled
+pilot; assisted local-data migration remains future work.
 
-Existing financial data is not uploaded, associated with an account, copied, renamed, or removed.
-Authentication and financial application state intentionally remain separate.
+Existing local financial data is not uploaded, associated with an account, copied, renamed, or
+removed automatically. Authentication and financial application state intentionally remain
+separate.
 
 ## Environment separation
 
@@ -137,12 +140,14 @@ npm run dev
 npm run dev:staging
 ```
 
-The financial product UI still reads only AppStore and localStorage. Selecting the staging Auth
-endpoint does not migrate, upload, namespace, or dual-write projects and transactions.
+The financial product UI still reads only the AppStore facade, which receives one repository for
+the authenticated session. Selecting the staging Auth endpoint alone does not migrate or upload
+projects and transactions. Accounts outside the allowlist remain local; an allowlisted pilot uses
+only the remote repository. There is no dual-write.
 
 ## Financial mode pilot configuration
 
-Sprint 16E-C prepares one financial source per authenticated session. The server resolves
+Sprint 16E-C introduced one financial source per authenticated session. The server resolves
 `local | remote` from `SMART_FINANCE_REMOTE_PILOT_USER_IDS`, a server-only comma-separated list of
 Supabase Auth user UUIDs. Missing, empty, malformed, duplicated or oversized configuration fails
 closed to `local`. The browser cannot choose or override the mode, and the variable must never use
@@ -153,8 +158,10 @@ For local verification, use only disposable users from the local Supabase instan
 localStorage and never falls back to it after a network or authorization error. A local session
 continues to use the existing per-user local repository and performs no remote financial write.
 
-The staging example keeps the allowlist empty. Promoting the pending migrations and enabling a
-disposable staging pilot are separate, explicitly approved operations in Sprint 16E-D.
+Versioned examples keep the allowlist empty and never contain a pilot identity. Sprint 16E-D
+promoted the reviewed migrations, validated the remote financial matrix, deployed with the pilot
+disabled and then enabled exactly one disposable account through the server-only staging binding.
+The pilot remains allowlist-controlled.
 
 ## Remote staging safety guard
 
@@ -243,11 +250,41 @@ Cloudflare Access was not configured because the Zero Trust Free onboarding requ
 method and no card was registered. This is not an application failure, but Access or an equivalent
 protection must be reconsidered before commercial/production exposure or broader staging access.
 
-The Project, Transaction and Import infrastructure prepared in Sprints 16B-16D is not a second
-financial source and does not activate remote persistence. Transaction CRUD remains unitary; bulk
-imports use only the atomic RPCs and never a CRUD loop. Preferences, assisted and reversible
-local-data migration and activation of the remote workspace remain subsequent Sprint 16
-checkpoints. Production separation, domain,
+The Project, Transaction and Import infrastructure prepared in Sprints 16B-16D is composed by the
+remote repository delivered in Sprint 16E. Transaction CRUD remains unitary; bulk imports use only
+the atomic RPCs and never a CRUD loop. The controlled pilot proved remote Projects, Transactions,
+preferences, CSV/XLSX imports and reimports without dual-write or automatic remote-to-local
+fallback. Assisted and reversible local-data migration remains Sprint 16F. Production separation,
+domain,
 SMTP, rate limiting, observability, backup/recovery, account export/deletion, LGPD operations,
 secret rotation and rollback remain additional commercial work. None of these capabilities was
 implemented by Sprint 15.
+
+## Sprint 16E closure
+
+Sprint 16E-D6 and Sprint 16E are **CLOSED with PASS**. Evidence is deliberately separated by
+origin:
+
+- **Automated evidence:** local repository, remote repository, financial-mode, Auth/RLS and remote
+  staging matrices cover ownership, A/B isolation, optimistic concurrency, atomic imports,
+  idempotency, preference versions, absence of CRUD import loops and absence of automatic fallback.
+- **Manual staging evidence:** the allowlisted account created and managed Projects and
+  Transactions through the UI; CSV and XLSX import and reimport covered added, changed and removed
+  rows, legitimate duplicates, manual rows and manually edited imported rows. Dashboard, Data,
+  Insights and Reports used the same remote source. Refresh, another browser and a mobile device
+  showed the same financial data. Search, filters, visible columns, deletion/cancellation, report
+  CSV and printing also passed. Offline use did not expose a local workspace, and reconnecting
+  restored the remote workspace.
+- **Persistence evidence:** the remote session did not write a financial workspace to
+  `localStorage`; no dual-write occurred. Column visibility persisted remotely and was observed on
+  another device.
+
+During acceptance, refresh initially selected the first remote Project instead of the current one.
+Commit `5a03169` stores `activeProjectId` as a per-user, per-device interface preference and restores
+it only after a valid remote snapshot. Manual retest passed. This preference may intentionally
+differ between devices and is not a financial workspace or a remote synchronization field.
+
+No known functional blocker remains for Sprint 16E. Sprint 16F is the next checkpoint and will
+design and implement assisted local-to-remote migration: detection, preview, explicit confirmation,
+ID conversion, idempotency, reconciliation, backup/rollback and safe handling of the unattributed
+global legacy key. Sprint 16F has not been implemented.
