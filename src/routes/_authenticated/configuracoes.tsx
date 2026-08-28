@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Check, HardDrive, Lock, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { Check, Cloud, HardDrive, Lock, LogOut, Mail, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { productTitle } from "@/lib/product-config";
 import { Panel } from "@/components/app/panel";
@@ -10,6 +10,7 @@ import { persistTheme, readStoredTheme, type Theme } from "@/lib/theme-service";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useApp } from "@/lib/app-store";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
@@ -43,6 +44,7 @@ const integrations = [
 function ConfigPage() {
   const [theme, setTheme] = useState<Theme>("light");
   const { user, logout, signingOut } = useAuth();
+  const { financialMode } = useApp();
 
   useEffect(() => {
     setTheme(readStoredTheme());
@@ -82,18 +84,37 @@ function ConfigPage() {
         <Panel title="Armazenamento" subtitle="Onde seus dados financeiros ficam nesta versão">
           <div className="rounded-xl border border-border bg-muted/35 p-4">
             <div className="flex gap-3">
-              <HardDrive className="mt-0.5 size-5 shrink-0 text-primary" />
+              {financialMode === "remote" ? (
+                <Cloud className="mt-0.5 size-5 shrink-0 text-primary" />
+              ) : (
+                <HardDrive className="mt-0.5 size-5 shrink-0 text-primary" />
+              )}
               <div className="min-w-0">
-                <p className="text-sm font-medium">Dados salvos somente neste dispositivo</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Seus projetos e lançamentos continuam armazenados localmente neste navegador. A
-                  conta protege o acesso ao produto, mas os dados financeiros ainda não são
-                  sincronizados com ela nem com outros dispositivos.
-                </p>
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <ShieldCheck className="size-3.5" /> Entrar ou sair da conta não apaga nem
-                  transfere seus dados locais.
-                </p>
+                {financialMode === "remote" ? (
+                  <>
+                    <p className="text-sm font-medium">Dados sincronizados com sua conta</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      Seus projetos, lançamentos e preferências financeiras ficam disponíveis quando
+                      você acessa sua conta em outros dispositivos.
+                    </p>
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <ShieldCheck className="size-3.5" /> O acesso aos dados acompanha sua sessão
+                      autenticada.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium">Dados salvos somente neste dispositivo</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      Seus projetos e lançamentos ficam armazenados localmente neste navegador e não
+                      são sincronizados com outros dispositivos.
+                    </p>
+                    <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <ShieldCheck className="size-3.5" /> Entrar ou sair da conta não apaga nem
+                      transfere seus dados locais.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>

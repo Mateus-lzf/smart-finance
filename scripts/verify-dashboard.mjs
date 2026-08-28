@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createServer } from "vite";
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
@@ -223,6 +224,10 @@ try {
   const timezone = buildDashboardAnalysis([row("2026-08-01", "receita", 100)]);
   assert.equal(timezone.period.startDate, "2026-08-01");
   assert.equal(timezone.period.endDate, "2026-08-01");
+
+  const kpiSource = await readFile("src/components/app/kpi-card.tsx", "utf8");
+  assert.match(kpiSource, /: brl\(value\);/);
+  assert.doesNotMatch(kpiSource, /brl\(value, true\)/);
 
   console.log("Dashboard verification passed.");
 } finally {

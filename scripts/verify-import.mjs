@@ -621,6 +621,15 @@ try {
   themeService.persistTheme("light", themeStorage);
   assert.equal(themeService.readStoredTheme(themeStorage), "light");
   console.log("Persistência do tema entre montagens e recargas: OK");
+
+  const dataTableSource = await readFile(
+    new URL("../src/components/app/data-table.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(dataTableSource, /window\.confirm/);
+  assert.match(dataTableSource, /<AlertDialog/);
+  assert.match(dataTableSource, /await deleteTransaction\(deletingTransaction\.id\)/);
+  assert.match(updateDialogSource, /edição manual será substituída/);
 } finally {
   await vite.close();
 }

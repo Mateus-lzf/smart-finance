@@ -18,6 +18,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Filters = { receita: boolean; despesa: boolean };
 
@@ -92,6 +101,8 @@ export function DataTable() {
   const [filters, setFilters] = useState<Filters>({ receita: true, despesa: true });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -131,6 +142,22 @@ export function DataTable() {
   const openEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingTransaction) return;
+    setDeleting(true);
+    try {
+      await deleteTransaction(deletingTransaction.id);
+      toast.success("Lançamento excluído.");
+      setDeletingTransaction(null);
+    } catch (cause) {
+      toast.error(
+        cause instanceof Error ? cause.message : "Não foi possível excluir o lançamento.",
+      );
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const coreColumns = [
@@ -331,18 +358,7 @@ export function DataTable() {
                         className="size-8 text-muted-foreground hover:text-destructive"
                         title="Excluir lançamento"
                         aria-label={`Excluir ${r.description}`}
-                        onClick={() => {
-                          if (!window.confirm(`Excluir o lançamento "${r.description}"?`)) return;
-                          void deleteTransaction(r.id)
-                            .then(() => toast.success("Lançamento excluído."))
-                            .catch((cause) =>
-                              toast.error(
-                                cause instanceof Error
-                                  ? cause.message
-                                  : "Não foi possível excluir o lançamento.",
-                              ),
-                            );
-                        }}
+                        onClick={() => setDeletingTransaction(r)}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -383,6 +399,37 @@ export function DataTable() {
           toast.success("Lançamento alterado.");
         }}
       />
+      <AlertDialog
+        open={Boolean(deletingTransaction)}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeletingTransaction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação removerá o lançamento selecionado. Confira os dados antes de continuar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deletingTransaction && (
+            <div className="rounded-xl border border-border bg-muted/35 p-3 text-sm">
+              <p className="font-medium text-foreground">{deletingTransaction.description}</p>
+              <p className="mt-1 text-muted-foreground">
+                {formatCalendarDate(deletingTransaction.date)} · {deletingTransaction.category} ·{" "}
+                {deletingTransaction.type === "receita" ? "+" : "−"}{" "}
+                {brl(deletingTransaction.amount)}
+              </p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+              {deleting ? "Excluindo..." : "Excluir lançamento"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

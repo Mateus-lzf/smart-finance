@@ -283,12 +283,11 @@ export function DataUpdateDialog() {
                 <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm">
                   <p className="flex gap-2 font-medium text-foreground">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-                    {comparison.manualEditsOverwritten.length} edição
+                    {comparison.manualEditsOverwritten.length}{" "}
                     {comparison.manualEditsOverwritten.length === 1
-                      ? " manual será"
-                      : "ões manuais serão"}
-                    substituída{comparison.manualEditsOverwritten.length === 1 ? "" : "s"} pelo
-                    arquivo.
+                      ? "edição manual será substituída"
+                      : "edições manuais serão substituídas"}{" "}
+                    pelo arquivo.
                   </p>
                   <p className="mt-1 pl-6 text-xs text-muted-foreground">
                     Isso afeta somente lançamentos originalmente importados. Revise antes de

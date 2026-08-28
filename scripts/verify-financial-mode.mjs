@@ -94,6 +94,10 @@ try {
   assert.match(appStore, /applyRemoteActiveProjectPreference/);
   assert.match(appStore, /createBrowserActiveProjectPreference/);
   assert.match(appStore, /error\.code === "CONFLICT"/);
+  const settingsSource = await readFile("src/routes/_authenticated/configuracoes.tsx", "utf8");
+  assert.match(settingsSource, /financialMode === "remote"/);
+  assert.match(settingsSource, /Dados sincronizados com sua conta/);
+  assert.match(settingsSource, /Dados salvos somente neste dispositivo/);
   assert.match(factory, /mode === "remote" \? factories\.remote\(\) :/);
   assert.doesNotMatch(factory, /catch\(|fallback/i);
   assert.match(localRepositorySource, /getUserLocalStateKey/);

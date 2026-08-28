@@ -58,7 +58,7 @@ export function KpiCard({
       ? "Não aplicável"
       : format === "percentage"
         ? `${value.toFixed(1).replace(".", ",")}%`
-        : brl(value, true);
+        : brl(value);
   return (
     <div className="surface group relative min-h-[104px] overflow-hidden p-3.5 transition-shadow hover:shadow-lift">
       <span className="absolute left-3.5 top-0 h-0.5 w-9 rounded-b-full bg-primary/70" />
