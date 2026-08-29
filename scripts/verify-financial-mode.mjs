@@ -12,13 +12,36 @@ try {
   const factoryModule = await vite.ssrLoadModule("/src/lib/financial-repository-factory.ts");
   const activeProjectModule = await vite.ssrLoadModule("/src/lib/active-project-preference.ts");
 
-  assert.equal(modeModule.resolveFinancialModeForUser(userA, undefined), "local");
-  assert.equal(modeModule.resolveFinancialModeForUser(userA, ""), "local");
-  assert.equal(modeModule.resolveFinancialModeForUser(userA, userB), "local");
-  assert.equal(modeModule.resolveFinancialModeForUser(userA, userA), "remote");
-  assert.equal(modeModule.resolveFinancialModeForUser(userB, `${userA},${userB}`), "remote");
-  assert.equal(modeModule.resolveFinancialModeForUser(userA, "not-a-user-id"), "local");
-  assert.equal(modeModule.resolveFinancialModeForUser(userA, `${userA},${userA}`), "local");
+  assert.deepEqual(modeModule.resolveFinancialMode("development"), {
+    status: "resolved",
+    mode: "local",
+  });
+  assert.deepEqual(modeModule.resolveFinancialMode("test"), {
+    status: "resolved",
+    mode: "local",
+  });
+  assert.deepEqual(modeModule.resolveFinancialMode("staging"), {
+    status: "resolved",
+    mode: "remote",
+  });
+  assert.deepEqual(modeModule.resolveFinancialMode("production"), {
+    status: "resolved",
+    mode: "remote",
+  });
+  assert.deepEqual(modeModule.resolveFinancialMode(undefined), { status: "unavailable" });
+  assert.deepEqual(modeModule.resolveFinancialMode(""), { status: "unavailable" });
+  assert.deepEqual(modeModule.resolveFinancialMode("preview"), { status: "unavailable" });
+
+  for (const identityOrClientInput of [
+    userA,
+    userB,
+    "?financialMode=local",
+    "localStorage=remote",
+  ]) {
+    assert.deepEqual(modeModule.resolveFinancialMode(identityOrClientInput), {
+      status: "unavailable",
+    });
+  }
 
   const calls = [];
   const localRepository = { source: "local-A" };
@@ -80,9 +103,10 @@ try {
     readFile("src/lib/financial-repository-factory.ts", "utf8"),
     readFile("src/lib/local-financial-repository.ts", "utf8"),
   ]);
-  assert.match(modeFunctions, /context\.user\.id/);
-  assert.doesNotMatch(modeFunctions, /\.validator\(|userId\s*:/);
+  assert.match(modeFunctions, /resolveFinancialMode\(\)/);
+  assert.doesNotMatch(modeFunctions, /context\.user\.id|\.validator\(|userId\s*:/);
   assert.match(route, /getFinancialMode\(\)/);
+  assert.match(route, /financialMode\.status === "unavailable"/);
   assert.match(route, /mode=\{financialMode\}/);
   assert.match(route, /<FinancialStateGate>/);
   assert.match(gate, /financialStatus === "ready"/);
@@ -122,17 +146,27 @@ try {
     );
   }
 
-  for (const file of [".env.example", ".env.staging.example", ".env.cloudflare.staging.example"]) {
+  const environmentTemplates = new Map([
+    [".env.example", "development"],
+    [".env.staging.example", "staging"],
+    [".env.cloudflare.staging.example", "staging"],
+  ]);
+  for (const [file, environment] of environmentTemplates) {
     const source = await readFile(file, "utf8");
-    assert.match(source, /^SMART_FINANCE_REMOTE_PILOT_USER_IDS=$/m);
-    assert.doesNotMatch(source, /VITE_SMART_FINANCE_REMOTE_PILOT_USER_IDS/);
+    assert.match(source, new RegExp(`^SMART_FINANCE_ENVIRONMENT=${environment}$`, "m"));
+    assert.doesNotMatch(source, /VITE_SMART_FINANCE_ENVIRONMENT/);
+    assert.doesNotMatch(source, /SMART_FINANCE_REMOTE_PILOT_USER_IDS/);
     assert.doesNotMatch(
       source,
       /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i,
     );
   }
 
-  console.log("Financial mode server authority and source-isolation checks passed.");
+  const modeSource = await readFile("src/lib/financial-mode.server.ts", "utf8");
+  assert.match(modeSource, /process\.env\["SMART_FINANCE_ENVIRONMENT"\]/);
+  assert.doesNotMatch(modeSource, /REMOTE_PILOT|userId|localStorage|location|searchParams/);
+
+  console.log("Environment-authoritative financial mode and source-isolation checks passed.");
 } finally {
   await vite.close();
 }

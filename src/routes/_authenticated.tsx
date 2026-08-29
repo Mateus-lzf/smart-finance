@@ -22,8 +22,11 @@ export const Route = createFileRoute("/_authenticated")({
         replace: true,
       });
     }
-    const { mode } = await getFinancialMode();
-    return { user: auth.user, financialMode: mode };
+    const financialMode = await getFinancialMode();
+    if (financialMode.status === "unavailable") {
+      throw redirect({ to: "/auth-indisponivel", replace: true });
+    }
+    return { user: auth.user, financialMode: financialMode.mode };
   },
   component: AuthenticatedApplication,
 });

@@ -1,3 +1,7 @@
 export type FinancialMode = "local" | "remote";
 
-export type FinancialModeResult = { mode: FinancialMode };
+export type FinancialModeResult =
+  | { status: "resolved"; mode: FinancialMode }
+  | {
+      status: "unavailable";
+    };

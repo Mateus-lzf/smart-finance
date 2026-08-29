@@ -1,22 +1,21 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
-import type { FinancialMode } from "./financial-mode";
+import type { FinancialModeResult } from "./financial-mode";
 
-const userIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export type FinancialEnvironment = "development" | "test" | "staging" | "production";
 
-export const resolveFinancialModeForUser = createServerOnlyFn(
+export const resolveFinancialMode = createServerOnlyFn(
   (
-    userId: string,
-    configuredAllowlist: string | undefined = process.env["SMART_FINANCE_REMOTE_PILOT_USER_IDS"],
-  ): FinancialMode => {
-    if (!configuredAllowlist?.trim()) return "local";
-    const values = configuredAllowlist.split(",").map((value: string) => value.trim());
-    if (
-      values.length > 100 ||
-      values.some((value: string) => !userIdPattern.test(value)) ||
-      new Set(values).size !== values.length
-    ) {
-      return "local";
+    configuredEnvironment: string | undefined = process.env["SMART_FINANCE_ENVIRONMENT"],
+  ): FinancialModeResult => {
+    switch (configuredEnvironment?.trim()) {
+      case "development":
+      case "test":
+        return { status: "resolved", mode: "local" };
+      case "staging":
+      case "production":
+        return { status: "resolved", mode: "remote" };
+      default:
+        return { status: "unavailable" };
     }
-    return values.includes(userId) ? "remote" : "local";
   },
 );
