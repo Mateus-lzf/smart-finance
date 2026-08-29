@@ -16,8 +16,7 @@ function AuthUnavailablePage() {
     >
       <div className="space-y-5">
         <AuthNotice tone="info">
-          Seus dados financeiros neste dispositivo não foram alterados. Aguarde um momento e tente
-          novamente.
+          Seus dados financeiros não foram alterados. Aguarde um momento e tente novamente.
         </AuthNotice>
         <Button asChild className="w-full">
           <Link to="/login">Tentar novamente</Link>

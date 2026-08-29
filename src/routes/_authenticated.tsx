@@ -5,6 +5,7 @@ import { getAuthState } from "@/lib/auth/auth-functions";
 import { sanitizeInternalRedirect } from "@/lib/auth/safe-redirect";
 import { getFinancialMode } from "@/lib/financial-mode-functions";
 import { FinancialStateGate } from "@/components/app/financial-state-gate";
+import { FinancialConfigurationUnavailable } from "@/components/app/financial-configuration-unavailable";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -23,10 +24,7 @@ export const Route = createFileRoute("/_authenticated")({
       });
     }
     const financialMode = await getFinancialMode();
-    if (financialMode.status === "unavailable") {
-      throw redirect({ to: "/auth-indisponivel", replace: true });
-    }
-    return { user: auth.user, financialMode: financialMode.mode };
+    return { user: auth.user, financialMode };
   },
   component: AuthenticatedApplication,
 });
@@ -35,7 +33,11 @@ function AuthenticatedApplication() {
   const { user, financialMode } = Route.useRouteContext();
   return (
     <AuthProvider initialUser={user}>
-      <AuthenticatedFinancialState mode={financialMode} />
+      {financialMode.status === "unavailable" ? (
+        <FinancialConfigurationUnavailable />
+      ) : (
+        <AuthenticatedFinancialState mode={financialMode.mode} />
+      )}
     </AuthProvider>
   );
 }

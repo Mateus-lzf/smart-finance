@@ -95,10 +95,21 @@ try {
   activeProjectModule.persistActiveProjectPreference(storage, userA, null);
   assert.equal(activeProjectModule.loadActiveProjectPreference(storage, userA), null);
 
-  const [route, appStore, gate, modeFunctions, factory, localRepositorySource] = await Promise.all([
+  const [
+    route,
+    appStore,
+    gate,
+    unavailableBoundary,
+    authUnavailableRoute,
+    modeFunctions,
+    factory,
+    localRepositorySource,
+  ] = await Promise.all([
     readFile("src/routes/_authenticated.tsx", "utf8"),
     readFile("src/lib/app-store.tsx", "utf8"),
     readFile("src/components/app/financial-state-gate.tsx", "utf8"),
+    readFile("src/components/app/financial-configuration-unavailable.tsx", "utf8"),
+    readFile("src/routes/auth-indisponivel.tsx", "utf8"),
     readFile("src/lib/financial-mode-functions.ts", "utf8"),
     readFile("src/lib/financial-repository-factory.ts", "utf8"),
     readFile("src/lib/local-financial-repository.ts", "utf8"),
@@ -107,7 +118,19 @@ try {
   assert.doesNotMatch(modeFunctions, /context\.user\.id|\.validator\(|userId\s*:/);
   assert.match(route, /getFinancialMode\(\)/);
   assert.match(route, /financialMode\.status === "unavailable"/);
-  assert.match(route, /mode=\{financialMode\}/);
+  assert.match(route, /<FinancialConfigurationUnavailable \/>/);
+  assert.match(route, /mode=\{financialMode\.mode\}/);
+  assert.doesNotMatch(route, /financialMode\.status === "unavailable"[\s\S]{0,100}redirect\(/);
+  assert.match(route, /<AuthProvider initialUser=\{user\}>/);
+  assert.match(unavailableBoundary, /router\.invalidate\(\)/);
+  assert.match(unavailableBoundary, /logout\(\)/);
+  assert.match(unavailableBoundary, /Sua sessão continua ativa/);
+  assert.doesNotMatch(
+    unavailableBoundary,
+    /AppProvider|LocalFinancialRepository|createLocalFinancialRepository|localStorage/,
+  );
+  assert.match(authUnavailableRoute, /Não conseguimos verificar sua conta neste momento/);
+  assert.doesNotMatch(authUnavailableRoute, /FinancialConfigurationUnavailable/);
   assert.match(route, /<FinancialStateGate>/);
   assert.match(gate, /financialStatus === "ready"/);
   assert.match(gate, /financialStatus === "initializing"/);
