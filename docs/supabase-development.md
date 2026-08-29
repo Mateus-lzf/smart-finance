@@ -115,7 +115,8 @@ not accepted as authority from client input.
 The browser client is the SSR-compatible user-session client. Sprint 14B2 completed the Auth UI,
 server-aware route protection, PKCE callbacks, password recovery and logout. It remains separate
 from the financial AppStore. Remote financial persistence is available only to the controlled
-pilot; assisted local-data migration remains future work.
+pilot. The former assisted local-data migration Sprint 16F was retired because there are no
+commercial legacy users; the commercial roadmap now starts with remote-by-default in Sprint 17.
 
 Existing local financial data is not uploaded, associated with an account, copied, renamed, or
 removed automatically. Authentication and financial application state intentionally remain
@@ -254,8 +255,8 @@ The Project, Transaction and Import infrastructure prepared in Sprints 16B-16D i
 remote repository delivered in Sprint 16E. Transaction CRUD remains unitary; bulk imports use only
 the atomic RPCs and never a CRUD loop. The controlled pilot proved remote Projects, Transactions,
 preferences, CSV/XLSX imports and reimports without dual-write or automatic remote-to-local
-fallback. Assisted and reversible local-data migration remains Sprint 16F. Production separation,
-domain,
+fallback. The former Sprint 16F was retired because no commercial legacy users require migration;
+`docs/commercial-roadmap.md` supersedes it. Production separation, domain,
 SMTP, rate limiting, observability, backup/recovery, account export/deletion, LGPD operations,
 secret rotation and rollback remain additional commercial work. None of these capabilities was
 implemented by Sprint 15.
@@ -284,7 +285,8 @@ Commit `5a03169` stores `activeProjectId` as a per-user, per-device interface pr
 it only after a valid remote snapshot. Manual retest passed. This preference may intentionally
 differ between devices and is not a financial workspace or a remote synchronization field.
 
-No known functional blocker remains for Sprint 16E. Sprint 16F is the next checkpoint and will
-design and implement assisted local-to-remote migration: detection, preview, explicit confirmation,
-ID conversion, idempotency, reconciliation, backup/rollback and safe handling of the unattributed
-global legacy key. Sprint 16F has not been implemented.
+No known functional blocker remains for Sprint 16E. No commercial legacy users exist, so the former
+assisted local-to-remote Sprint 16F was retired rather than implemented speculatively. The roadmap
+continues in `docs/commercial-roadmap.md`; Sprint 17 is the next implementation checkpoint and will
+make remote persistence the safe commercial default while preserving local mode only for an
+explicit development/test purpose.

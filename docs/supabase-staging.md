@@ -107,7 +107,7 @@ reconsidered before commercial/production exposure or broader staging access. `X
 
 The following commercial capabilities remain intentionally outside Sprint 15:
 
-- assisted migration of per-user and legacy local data;
+- commercial remote-by-default rollout under Sprint 17; no legacy migration is currently planned;
 - separate production Supabase and Cloudflare environments;
 - permanent domain and transactional SMTP;
 - rate limiting, production observability and alerting;
@@ -149,10 +149,10 @@ Sprint 16E-D6 and Sprint 16E are **CLOSED with PASS**. No known functional block
   Active Project selection is intentionally a per-device interface preference and may differ across
   devices.
 
-There was no automatic migration of existing users or local data. Sprint 16F is next and will cover
-assisted local-to-remote migration with detection, preview, confirmation, ID conversion,
-idempotency, reconciliation, backup/rollback and explicit treatment of the unattributed global
-legacy key. Sprint 16F has not started.
+There was no automatic migration of existing users or local data. No commercial legacy users exist,
+so the former assisted local-to-remote Sprint 16F has been retired rather than implemented without
+a demonstrated migration need. `docs/commercial-roadmap.md` is now the roadmap source of truth;
+Sprint 17, remote-by-default and commercial onboarding, is the next implementation checkpoint.
 
 ## Rollback rules
 

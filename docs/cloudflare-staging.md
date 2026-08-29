@@ -106,8 +106,9 @@ external state and is not recorded in Git. Production requires its own documente
 ## Commercial gaps after Sprint 15
 
 This staging deployment is not a production launch. The controlled remote pilot and atomic remote
-imports passed Sprint 16E acceptance, but assisted local-data migration remains Sprint 16F.
-Production environments, domain, SMTP, rate limiting, observability, backups, account
+imports passed Sprint 16E acceptance. The former assisted local-data migration Sprint 16F was
+retired because no commercial legacy users exist; `docs/commercial-roadmap.md` supersedes it, and
+Sprint 17 is the next implementation checkpoint. Production environments, domain, SMTP, rate limiting, observability, backups, account
 export/deletion, LGPD operations, secret rotation and production rollback remain future work.
 
 ## Sprint 16E remote pilot acceptance
