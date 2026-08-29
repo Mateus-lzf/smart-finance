@@ -1,10 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Check, Cloud, HardDrive, Lock, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { Check, Cloud, HardDrive, LogOut, Mail, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { productTitle } from "@/lib/product-config";
 import { Panel } from "@/components/app/panel";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { persistTheme, readStoredTheme, type Theme } from "@/lib/theme-service";
 import { useAuth } from "@/lib/auth/auth-provider";
@@ -18,12 +17,8 @@ export const Route = createFileRoute("/_authenticated/configuracoes")({
       { title: productTitle("Configurações da conta") },
       {
         name: "description",
-        content: "Ajuste perfil, tema, idioma, plano e integrações da sua conta.",
+        content: "Consulte sua conta, o armazenamento financeiro e as opções de aparência.",
       },
-      { property: "og:title", content: productTitle("Configurações da conta") },
-      { property: "og:description", content: "Perfil, aparência, idioma e plano em um só lugar." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ConfigPage,
@@ -33,13 +28,6 @@ const themes = [
   { id: "light", label: "Claro" },
   { id: "dark", label: "Escuro" },
 ] as const;
-
-const integrations = [
-  { name: "Conta bancária (Open Finance)", desc: "Sincronize extratos automaticamente" },
-  { name: "Nota fiscal eletrônica", desc: "Importe suas NF-e emitidas" },
-  { name: "Google Sheets", desc: "Mantenha planilhas espelhadas" },
-  { name: "WhatsApp", desc: "Receba resumos financeiros" },
-];
 
 function ConfigPage() {
   const [theme, setTheme] = useState<Theme>("light");
@@ -60,7 +48,7 @@ function ConfigPage() {
   }
 
   return (
-    <AppShell title="Configurações" description="Sua conta, aparência e integrações">
+    <AppShell title="Configurações" description="Sua conta, armazenamento e aparência">
       <div className="grid min-w-0 max-w-4xl gap-5 [&>*]:min-w-0">
         <Panel title="Conta" subtitle="Identidade usada para acessar o Smart Finance">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -144,25 +132,6 @@ function ConfigPage() {
               </button>
             ))}
           </div>
-        </Panel>
-
-        <Panel title="Integrações" subtitle="Em breve nesta conta">
-          <ul className="space-y-3">
-            {integrations.map((i) => (
-              <li
-                key={i.name}
-                className="flex min-w-0 items-center justify-between gap-4 opacity-60"
-              >
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-sm font-medium">
-                    <Lock className="size-3.5" /> {i.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{i.desc}</p>
-                </div>
-                <Switch disabled />
-              </li>
-            ))}
-          </ul>
         </Panel>
       </div>
     </AppShell>

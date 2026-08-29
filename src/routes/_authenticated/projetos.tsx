@@ -25,7 +25,15 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/projetos")({
-  head: () => ({ meta: [{ title: productTitle("Seus projetos financeiros") }] }),
+  head: () => ({
+    meta: [
+      { title: productTitle("Seus projetos financeiros") },
+      {
+        name: "description",
+        content: "Crie e gerencie os projetos financeiros da sua conta.",
+      },
+    ],
+  }),
   component: ProjetosPage,
 });
 

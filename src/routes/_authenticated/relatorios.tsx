@@ -35,7 +35,15 @@ import {
 import type { ReportFilters, ReportGrouping, ReportTypeFilter } from "@/lib/report-types";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
-  head: () => ({ meta: [{ title: productTitle("Relatórios financeiros") }] }),
+  head: () => ({
+    meta: [
+      { title: productTitle("Relatórios financeiros") },
+      {
+        name: "description",
+        content: "Consulte, filtre e exporte relatórios dos lançamentos do projeto.",
+      },
+    ],
+  }),
   component: RelatoriosPage,
 });
 

@@ -75,18 +75,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: productTitle("Organização financeira") },
+      { title: productTitle("Gestão financeira") },
       {
         name: "description",
-        content: "A camada de inteligência sobre suas planilhas financeiras.",
+        content: "Organize projetos, lançamentos, indicadores e relatórios financeiros.",
       },
-      { property: "og:title", content: productTitle("Organização financeira") },
-      {
-        property: "og:description",
-        content: "Transforme planilhas em indicadores financeiros organizados.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      // Temporary global block: Sprint 20 must revisit indexing when a public landing page exists.
+      { name: "robots", content: "noindex, nofollow" },
     ],
     links: [
       {

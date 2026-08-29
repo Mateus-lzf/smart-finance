@@ -28,13 +28,6 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
         name: "description",
         content: "Receitas, despesas e resultado calculados a partir dos lançamentos do projeto.",
       },
-      { property: "og:title", content: productTitle("Dashboard financeiro") },
-      {
-        property: "og:description",
-        content: "Indicadores financeiros atualizados a partir dos dados do seu projeto.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Dashboard,

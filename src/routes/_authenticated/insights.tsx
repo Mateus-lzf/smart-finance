@@ -18,7 +18,15 @@ import { useApp } from "@/lib/app-store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/insights")({
-  head: () => ({ meta: [{ title: productTitle("Insights financeiros") }] }),
+  head: () => ({
+    meta: [
+      { title: productTitle("Insights financeiros") },
+      {
+        name: "description",
+        content: "Análises objetivas calculadas a partir dos lançamentos do projeto.",
+      },
+    ],
+  }),
   component: InsightsPage,
 });
 

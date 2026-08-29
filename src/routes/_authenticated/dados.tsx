@@ -11,15 +11,8 @@ export const Route = createFileRoute("/_authenticated/dados")({
       { title: productTitle("Dados e lançamentos") },
       {
         name: "description",
-        content: "Uma tabela leve para pesquisar, filtrar e editar seus lançamentos financeiros.",
+        content: "Pesquise, filtre, crie e edite os lançamentos financeiros do projeto.",
       },
-      { property: "og:title", content: productTitle("Dados e lançamentos") },
-      {
-        property: "og:description",
-        content: "Pesquise, filtre e edite lançamentos como em um documento.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: DadosPage,
