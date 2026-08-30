@@ -1,4 +1,5 @@
 import { formatCalendarDate } from "./calendar-date";
+import { escapeCsvText } from "./csv-serialization";
 import type { ImportedColumn, ImportedValue, Transaction } from "./finance-types";
 import type { FinancialReport } from "./report-types";
 
@@ -24,17 +25,6 @@ function textualValue(value: ImportedValue | undefined) {
   if (value === null || value === undefined) return "";
   if (typeof value === "boolean") return value ? "Sim" : "Não";
   return String(value);
-}
-
-function protectText(value: string) {
-  return /^\s*[=+\-@]/.test(value) ? `'${value}` : value;
-}
-
-function escapeCsvText(value: string) {
-  const protectedValue = protectText(value);
-  return /[;"\r\n]|^\s|\s$/.test(protectedValue)
-    ? `"${protectedValue.replace(/"/g, '""')}"`
-    : protectedValue;
 }
 
 function numericCsvValue(value: number) {
