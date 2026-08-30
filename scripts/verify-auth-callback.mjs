@@ -5,12 +5,13 @@ import { createServer } from "vite";
 const SUPABASE_URL = "https://abcdefghijklmnopqrst.supabase.co";
 const PUBLISHABLE_KEY = "sb_publishable_callback_test";
 const FLOW_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+const consumedTokenHashes = new Set();
 
 const user = {
   id: "00000000-0000-0000-0000-000000000001",
   aud: "authenticated",
   role: "authenticated",
-  email: "callback@example.test",
+  email: "callback+smartfinance17e@example.test",
   app_metadata: {},
   user_metadata: {},
   identities: [],
@@ -25,6 +26,23 @@ function createCallbackHarness() {
     requests.push({ url, init });
     if (url.includes("/signup")) return Response.json(user);
     if (url.includes("/recover")) return Response.json({});
+    if (url.includes("/verify")) {
+      const body = JSON.parse(String(init.body ?? "{}"));
+      if (body.token_hash === "expired-token" || consumedTokenHashes.has(body.token_hash)) {
+        return Response.json(
+          { code: "otp_expired", msg: "Token has expired or is invalid" },
+          { status: 403 },
+        );
+      }
+      consumedTokenHashes.add(body.token_hash);
+      return Response.json({
+        access_token: "header.payload.signature",
+        refresh_token: `refresh-${body.token_hash}`,
+        expires_in: 3600,
+        token_type: "bearer",
+        user,
+      });
+    }
     if (url.includes("/token?grant_type=pkce")) {
       const body = JSON.parse(String(init.body ?? "{}"));
       if (body.auth_code === "expired-code") {
@@ -70,59 +88,58 @@ const { client, requests } = createCallbackHarness();
 await client.auth.signUp({
   email: user.email,
   password: "SenhaSegura123!",
-  options: { emailRedirectTo: "http://localhost:3000/auth/callback?next=%2Fdashboard" },
+  options: { emailRedirectTo: "http://localhost:3000/auth/confirmar?next=%2Fdashboard" },
 });
 const signupCallback = callbackFromRequest(requests.at(-1));
 assert.equal(signupCallback.origin, "http://localhost:3000");
-assert.equal(signupCallback.pathname, "/auth/callback");
+assert.equal(signupCallback.pathname, "/auth/confirmar");
 assert.equal(signupCallback.searchParams.get("next"), "/dashboard");
-const signupFlowId = signupCallback.searchParams.get("sb_flow_id");
-assert.match(signupFlowId ?? "", FLOW_ID_PATTERN, "signup carries its PKCE flow id");
+assert.match(
+  signupCallback.searchParams.get("sb_flow_id") ?? "",
+  FLOW_ID_PATTERN,
+  "PKCE correlation remains available for other flows",
+);
 
 await client.auth.resetPasswordForEmail(user.email, {
   redirectTo:
-    "https://smart-finance-staging.smartfinance-lab.workers.dev/auth/callback?next=%2Fredefinir-senha",
+    "https://smart-finance-staging.smartfinance-lab.workers.dev/auth/confirmar?next=%2Fredefinir-senha",
 });
 const recoveryCallback = callbackFromRequest(requests.at(-1));
 assert.equal(recoveryCallback.origin, "https://smart-finance-staging.smartfinance-lab.workers.dev");
 assert.equal(recoveryCallback.searchParams.get("next"), "/redefinir-senha");
-const recoveryFlowId = recoveryCallback.searchParams.get("sb_flow_id");
-assert.match(recoveryFlowId ?? "", FLOW_ID_PATTERN, "recovery carries its PKCE flow id");
-assert.notEqual(signupFlowId, recoveryFlowId, "overlapping email flows have distinct identifiers");
+assert.equal(recoveryCallback.pathname, "/auth/confirmar");
 
-const signupExchange = await client.auth.exchangeCodeForSession("signup-code", {
-  flowId: signupFlowId,
+const crossContextSignup = createCallbackHarness();
+const signupVerification = await crossContextSignup.client.auth.verifyOtp({
+  token_hash: "signup-token",
+  type: "email",
 });
-assert.ifError(signupExchange.error);
-assert.equal(signupExchange.data.redirectType, null);
+assert.ifError(signupVerification.error);
+assert.equal(signupVerification.data.user?.email, user.email);
 
-const reusedExchange = await client.auth.exchangeCodeForSession("signup-code", {
-  flowId: signupFlowId,
+const reusedContext = createCallbackHarness();
+const reusedVerification = await reusedContext.client.auth.verifyOtp({
+  token_hash: "signup-token",
+  type: "email",
 });
-assert.equal(reusedExchange.error?.name, "AuthPKCECodeVerifierMissingError");
+assert.ok(reusedVerification.error, "a token cannot become a second session");
 
-const expiredHarness = createCallbackHarness();
-await expiredHarness.client.auth.signUp({
-  email: user.email,
-  password: "SenhaSegura123!",
-  options: { emailRedirectTo: "http://localhost:3000/auth/callback" },
-});
-const expiredFlowId = callbackFromRequest(expiredHarness.requests.at(-1)).searchParams.get(
-  "sb_flow_id",
-);
-const expiredExchange = await expiredHarness.client.auth.exchangeCodeForSession("expired-code", {
-  flowId: expiredFlowId,
+const expiredContext = createCallbackHarness();
+const expiredVerification = await expiredContext.client.auth.verifyOtp({
+  token_hash: "expired-token",
+  type: "email",
 });
 assert.ok(
-  expiredExchange.error,
-  "expired callback is rejected instead of becoming a false success",
+  expiredVerification.error,
+  "expired token is rejected instead of becoming a false success",
 );
 
-const recoveryExchange = await client.auth.exchangeCodeForSession("recovery-code", {
-  flowId: recoveryFlowId,
+const crossContextRecovery = createCallbackHarness();
+const recoveryVerification = await crossContextRecovery.client.auth.verifyOtp({
+  token_hash: "recovery-token",
+  type: "recovery",
 });
-assert.ifError(recoveryExchange.error);
-assert.equal(recoveryExchange.data.redirectType, "recovery");
+assert.ifError(recoveryVerification.error);
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: "custom" });
 try {
@@ -137,5 +154,5 @@ try {
 }
 
 console.log(
-  "Auth email callbacks, PKCE flow correlation, expiry, reuse and safe redirects passed locally.",
+  "Cross-context Auth email tokens, explicit verification, expiry, reuse and safe redirects passed locally.",
 );

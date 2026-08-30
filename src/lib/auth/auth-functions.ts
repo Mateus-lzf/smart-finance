@@ -4,7 +4,7 @@ import { z } from "zod";
 import { createSupabaseServerClient } from "../supabase/server-client";
 import { authenticatedServerFunctionMiddleware } from "./auth-middleware";
 import { sanitizeInternalRedirect } from "./safe-redirect";
-import type { AuthActionResult, AuthResult, AuthState } from "./auth-types";
+import type { AuthActionResult, AuthResult, AuthState, EmailActionType } from "./auth-types";
 
 const credentialsSchema = z.object({
   email: z.string().trim().email().max(254),
@@ -27,10 +27,15 @@ const authCodeSchema = z.object({
   flowId: z.string().min(1).max(512).optional(),
 });
 
+const emailTokenSchema = z.object({
+  tokenHash: z.string().min(1).max(4096),
+  type: z.enum(["email", "recovery"] satisfies [EmailActionType, ...EmailActionType[]]),
+});
+
 const passwordSchema = z.object({ password: z.string().min(8).max(128) });
 
-function callbackUrl(next: string): string {
-  const url = new URL("/auth/callback", getRequestUrl().origin);
+function emailActionUrl(next: string): string {
+  const url = new URL("/auth/confirmar", getRequestUrl().origin);
   url.searchParams.set("next", sanitizeInternalRedirect(next));
   return url.toString();
 }
@@ -54,7 +59,7 @@ export const signUp = createServerFn({ method: "POST" })
       email: data.email,
       password: data.password,
       options: {
-        emailRedirectTo: callbackUrl(data.next ?? "/dashboard"),
+        emailRedirectTo: emailActionUrl(data.next ?? "/dashboard"),
         ...(data.displayName ? { data: { display_name: data.displayName } } : {}),
       },
     };
@@ -145,7 +150,7 @@ export const resendSignupConfirmation = createServerFn({ method: "POST" })
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: data.email,
-      options: { emailRedirectTo: callbackUrl(data.next ?? "/dashboard") },
+      options: { emailRedirectTo: emailActionUrl(data.next ?? "/dashboard") },
     });
     return error ? { ok: false, code: "unavailable" } : { ok: true };
   });
@@ -155,7 +160,7 @@ export const requestPasswordRecovery = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<AuthActionResult> => {
     const supabase = createSupabaseServerClient();
     const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-      redirectTo: callbackUrl("/redefinir-senha"),
+      redirectTo: emailActionUrl("/redefinir-senha"),
     });
     return error ? { ok: false, code: "unavailable" } : { ok: true };
   });
@@ -168,6 +173,20 @@ export const exchangeAuthCode = createServerFn({ method: "POST" })
       data.code,
       data.flowId ? { flowId: data.flowId } : undefined,
     );
+    if (!error) return { ok: true };
+    return classifySessionFailure(error).status === "unavailable"
+      ? { ok: false, code: "unavailable" }
+      : { ok: false, code: "invalid_or_expired" };
+  });
+
+export const verifyEmailToken = createServerFn({ method: "POST" })
+  .validator(emailTokenSchema)
+  .handler(async ({ data }): Promise<AuthActionResult> => {
+    const supabase = createSupabaseServerClient();
+    const { error } = await supabase.auth.verifyOtp({
+      token_hash: data.tokenHash,
+      type: data.type,
+    });
     if (!error) return { ok: true };
     return classifySessionFailure(error).status === "unavailable"
       ? { ok: false, code: "unavailable" }

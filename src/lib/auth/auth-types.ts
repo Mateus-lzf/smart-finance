@@ -14,3 +14,5 @@ export type AuthState =
 
 export type AuthActionResult =
   { ok: true } | { ok: false; code: "invalid_or_expired" | "unavailable" };
+
+export type EmailActionType = "email" | "recovery";

@@ -18,6 +18,7 @@ try {
     authenticatedLayout,
     loginRoute,
     callbackRoute,
+    confirmationRoute,
     authFunctions,
   ] = await Promise.all([
     readFile("src/routes/_authenticated/index.tsx", "utf8"),
@@ -25,6 +26,7 @@ try {
     readFile("src/routes/_authenticated.tsx", "utf8"),
     readFile("src/routes/login.tsx", "utf8"),
     readFile("src/routes/auth/callback.tsx", "utf8"),
+    readFile("src/routes/auth/confirmar.tsx", "utf8"),
     readFile("src/lib/auth/auth-functions.ts", "utf8"),
   ]);
 
@@ -39,8 +41,14 @@ try {
   );
   assert.match(loginRoute, /status === ["']authenticated["']/);
   assert.match(callbackRoute, /sanitizeInternalRedirect\(search\.next\)/);
-  assert.match(authFunctions, /callbackUrl\(data\.next \?\? ["']\/dashboard["']\)/);
-  assert.match(authFunctions, /callbackUrl\(["']\/redefinir-senha["']\)/);
+  assert.doesNotMatch(confirmationRoute, /beforeLoad[\s\S]*verifyEmailToken/);
+  assert.match(confirmationRoute, /onSubmit=\{handleConfirmation\}/);
+  assert.match(confirmationRoute, /window\.location\.hash/);
+  assert.match(confirmationRoute, /window\.history\.replaceState/);
+  assert.match(confirmationRoute, /sanitizeInternalRedirect\(search\.next/);
+  assert.match(authFunctions, /emailActionUrl\(data\.next \?\? ["']\/dashboard["']\)/);
+  assert.match(authFunctions, /emailActionUrl\(["']\/redefinir-senha["']\)/);
+  assert.match(authFunctions, /auth\.verifyOtp/);
 
   console.log("Navegação Auth canônica, raiz e redirects seguros: OK");
   console.log("Estado vazio existe no Dashboard autenticado com AppShell: OK");

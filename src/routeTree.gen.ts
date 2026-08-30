@@ -25,6 +25,7 @@ import { Route as AuthenticatedInsightsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as AuthConfirmarRouteImport } from './routes/auth/confirmar'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -106,6 +107,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthConfirmarRoute = AuthConfirmarRouteImport.update({
+  id: '/auth/confirmar',
+  path: '/auth/confirmar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/projetos': typeof AuthenticatedProjetosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/auth/confirmar': typeof AuthConfirmarRoute
 }
 export interface FileRoutesByTo {
   '/auth-indisponivel': typeof AuthIndisponivelRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/projetos': typeof AuthenticatedProjetosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/auth/confirmar': typeof AuthConfirmarRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_authenticated/projetos': typeof AuthenticatedProjetosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/auth/confirmar': typeof AuthConfirmarRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/relatorios'
     | '/auth/callback'
+    | '/auth/confirmar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth-indisponivel'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/relatorios'
     | '/auth/callback'
+    | '/auth/confirmar'
     | '/'
   id:
     | '__root__'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projetos'
     | '/_authenticated/relatorios'
     | '/auth/callback'
+    | '/auth/confirmar'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthConfirmarRoute: typeof AuthConfirmarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -339,6 +352,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/confirmar': {
+      id: '/auth/confirmar'
+      path: '/auth/confirmar'
+      fullPath: '/auth/confirmar'
+      preLoaderRoute: typeof AuthConfirmarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -378,6 +398,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  AuthConfirmarRoute: AuthConfirmarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -94,7 +94,7 @@ async function waitForServer(origin = APP_ORIGIN) {
   throw new Error("O servidor Vite não iniciou para o teste de Auth.");
 }
 
-async function consumeAuthEmail(mailpitUrl, email, expectedType) {
+async function readAuthEmailAction(mailpitUrl, email, expectedType) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const list = await fetch(`${mailpitUrl}/api/v1/messages`).then((response) => response.json());
     const messages = (list.messages ?? []).filter((item) =>
@@ -105,15 +105,18 @@ async function consumeAuthEmail(mailpitUrl, email, expectedType) {
         response.json(),
       );
       const content = `${detail.Text ?? ""}\n${detail.HTML ?? ""}`.replaceAll("&amp;", "&");
-      const match = content.match(/https?:\/\/127\.0\.0\.1:54321\/auth\/v1\/verify\?[^\s"'<>]+/);
+      const match = content.match(/https?:\/\/127\.0\.0\.1:3000\/auth\/confirmar\?[^\s"'<>]+/);
       if (!match) continue;
-      const verificationUrl = new URL(match[0]);
-      if (verificationUrl.searchParams.get("type") !== expectedType) continue;
-      const verified = await fetch(match[0], { redirect: "manual" });
-      assert.ok([302, 303].includes(verified.status), `${expectedType} verification succeeds`);
-      const redirectLocation = verified.headers.get("location");
-      assert.ok(redirectLocation, `${expectedType} verification returns an application callback`);
-      return redirectLocation;
+      const actionUrl = new URL(match[0]);
+      const fragment = new URLSearchParams(actionUrl.hash.slice(1));
+      if (fragment.get("type") !== expectedType) continue;
+      assert.ok(fragment.get("token_hash"), `${expectedType} email carries a token hash`);
+      assert.equal(
+        actionUrl.searchParams.has("token_hash"),
+        false,
+        "token is absent from query logs",
+      );
+      return actionUrl;
     }
     await delay(250);
   }
@@ -265,30 +268,39 @@ try {
           "confirmation email can be resent",
         );
       }
-      const callbackUrl = await consumeAuthEmail(local.MAILPIT_URL, account.email, "signup");
-      assert.match(
-        new URL(callbackUrl, APP_ORIGIN).searchParams.get("sb_flow_id") ?? "",
-        /^[A-Za-z0-9_-]{8,64}$/,
-        "signup callback carries the PKCE flow identifier",
-      );
-      const callbackResponse = await clients[index].request(callbackUrl);
-      assert.ok(
-        [302, 307].includes(callbackResponse.status),
-        "PKCE callback redirects after exchange",
-      );
-      const callbackDestination = new URL(callbackResponse.headers.get("location"), APP_ORIGIN);
+      const actionUrl = await readAuthEmailAction(local.MAILPIT_URL, account.email, "email");
+      const confirmationClient = createCookieFetch();
+      const actionPage = await confirmationClient.request(actionUrl.toString());
+      assert.equal(actionPage.status, 200, "opening the email action does not consume its token");
+      const confirmation = await auth.verifyEmailToken({
+        data: {
+          tokenHash: new URLSearchParams(actionUrl.hash.slice(1)).get("token_hash"),
+          type: "email",
+        },
+        fetch: confirmationClient.request,
+      });
+      assert.equal(confirmation.ok, true, "a different browser context confirms signup");
+      const callbackDestination = new URL(actionUrl.searchParams.get("next"), APP_ORIGIN);
       assert.equal(
         callbackDestination.pathname,
         index === 0 ? "/dashboard" : "/dados",
-        "callback uses only the sanitized internal destination",
+        "email action uses only the sanitized internal destination",
       );
-      const confirmedUser = await auth.getCurrentUser({ fetch: clients[index].request });
-      assert.equal(confirmedUser.email, account.email, "PKCE callback establishes the session");
-      const reusedCallback = await clients[index].request(callbackUrl);
-      assert.ok([302, 307].includes(reusedCallback.status), "reused callback is handled safely");
-      const reusedDestination = new URL(reusedCallback.headers.get("location"), APP_ORIGIN);
-      assert.equal(reusedDestination.pathname, "/login");
-      assert.equal(reusedDestination.searchParams.get("authError"), "invalid_callback");
+      const confirmedUser = await auth.getCurrentUser({ fetch: confirmationClient.request });
+      assert.equal(
+        confirmedUser.email,
+        account.email,
+        "token verification establishes the session",
+      );
+      const reusedConfirmation = await auth.verifyEmailToken({
+        data: {
+          tokenHash: new URLSearchParams(actionUrl.hash.slice(1)).get("token_hash"),
+          type: "email",
+        },
+        fetch: createCookieFetch().request,
+      });
+      assert.deepEqual(reusedConfirmation, { ok: false, code: "invalid_or_expired" });
+      clients[index] = confirmationClient;
     }
 
     const missingCallback = await anonymous.request("/auth/callback");
@@ -961,41 +973,46 @@ try {
       true,
       "password recovery request is accepted",
     );
-    const recoveryCallbackUrl = await consumeAuthEmail(
+    const recoveryActionUrl = await readAuthEmailAction(
       local.MAILPIT_URL,
       accounts[1].email,
       "recovery",
     );
-    assert.match(
-      new URL(recoveryCallbackUrl, APP_ORIGIN).searchParams.get("sb_flow_id") ?? "",
-      /^[A-Za-z0-9_-]{8,64}$/,
-      "recovery callback carries the PKCE flow identifier",
-    );
-    const recoveryCallback = await recoveryClient.request(recoveryCallbackUrl);
-    assert.ok(
-      [302, 307].includes(recoveryCallback.status),
-      "recovery callback exchanges PKCE code",
+    const recoveryConfirmationClient = createCookieFetch();
+    assert.equal(
+      (await recoveryConfirmationClient.request(recoveryActionUrl.toString())).status,
+      200,
+      "opening recovery email does not consume its token",
     );
     assert.equal(
-      new URL(recoveryCallback.headers.get("location"), APP_ORIGIN).pathname,
-      "/redefinir-senha",
+      (
+        await auth.verifyEmailToken({
+          data: {
+            tokenHash: new URLSearchParams(recoveryActionUrl.hash.slice(1)).get("token_hash"),
+            type: "recovery",
+          },
+          fetch: recoveryConfirmationClient.request,
+        })
+      ).ok,
+      true,
+      "a different browser context confirms recovery",
     );
     const replacementPassword = "NovaSenhaSeguraB456!";
     assert.equal(
       (
         await auth.updateRecoveredPassword({
           data: { password: replacementPassword },
-          fetch: recoveryClient.request,
+          fetch: recoveryConfirmationClient.request,
         })
       ).ok,
       true,
       "authenticated recovery session can redefine the password",
     );
-    await auth.signOut({ fetch: recoveryClient.request });
+    await auth.signOut({ fetch: recoveryConfirmationClient.request });
     assert.deepEqual(
       await auth.signIn({
         data: { email: accounts[1].email, password: accounts[1].password },
-        fetch: recoveryClient.request,
+        fetch: recoveryConfirmationClient.request,
       }),
       { ok: false, code: "invalid_credentials" },
       "old password no longer authenticates",
@@ -1004,7 +1021,7 @@ try {
       (
         await auth.signIn({
           data: { email: accounts[1].email, password: replacementPassword },
-          fetch: recoveryClient.request,
+          fetch: recoveryConfirmationClient.request,
         })
       ).ok,
       true,
@@ -1074,7 +1091,7 @@ try {
     );
     try {
       await waitForServer(unavailableOrigin);
-      const authenticatedCookieHeader = [...recoveryClient.cookies]
+      const authenticatedCookieHeader = [...recoveryConfirmationClient.cookies]
         .map(([name, value]) => `${name}=${value}`)
         .join("; ");
       const unavailableResponse = await fetch(`${unavailableOrigin}/dashboard`, {
