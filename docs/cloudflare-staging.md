@@ -78,10 +78,11 @@ The following evidence closed the application-runtime portion of Checkpoint 15D-
   `/dashboard`, authenticated session, refresh, logout, anonymous-route rejection, canonical
   post-login navigation and password recovery/reset/login passed over HTTPS.
 
-Sprint 16E subsequently enabled one disposable remote financial pilot through the server-only
-allowlist. That session uses only `RemoteFinancialRepository`; non-allowlisted sessions continue to
-use their per-user local workspace. The Worker does not migrate or dual-write local data, and a
-remote failure never falls back to a local workspace.
+Sprint 16E subsequently enabled one disposable remote financial pilot. Sprint 17 then promoted
+staging to remote-by-default through `SMART_FINANCE_ENVIRONMENT=staging` and removed the legacy
+allowlist secret. Every authenticated staging session uses `RemoteFinancialRepository`; invalid or
+missing environment configuration is unavailable rather than local. The Worker does not migrate or
+dual-write local data, and a remote failure never falls back to a local workspace.
 
 ## Security before first deploy
 
@@ -107,8 +108,9 @@ external state and is not recorded in Git. Production requires its own documente
 
 This staging deployment is not a production launch. The controlled remote pilot and atomic remote
 imports passed Sprint 16E acceptance. The former assisted local-data migration Sprint 16F was
-retired because no commercial legacy users exist; `docs/commercial-roadmap.md` supersedes it, and
-Sprint 17 is the next implementation checkpoint. Production environments, domain, SMTP, rate limiting, observability, backups, account
+retired because no commercial legacy users exist; `docs/commercial-roadmap.md` supersedes it.
+Sprint 17 is closed with PASS and Sprint 18 is next. Production environments, domain, transactional
+SMTP, rate limiting, observability, backups, account
 export/deletion, LGPD operations, secret rotation and production rollback remain future work.
 
 ## Sprint 16E remote pilot acceptance
@@ -121,5 +123,19 @@ workspace was written to `localStorage`, and no dual-write occurred.
 
 The active-Project refresh bug found during acceptance was fixed in commit `5a03169` and manually
 retested with PASS. Active selection is a per-user, per-device UI preference; financial data and
-Project preferences remain remote. The pilot continues to be controlled exclusively by the
-server-side allowlist, with no real identity stored in Git.
+Project preferences remain remote.
+
+## Sprint 17 remote-by-default and Auth email acceptance
+
+Sprint 17 is **CLOSED with PASS**. The deployed Worker resolves staging as remote for every
+authenticated account without consulting identity, query parameters or browser storage. The legacy
+`SMART_FINANCE_REMOTE_PILOT_USER_IDS` secret was removed after deployment. A newly created account
+that had never been allowlisted received an empty remote workspace; UI-created financial data
+survived refresh, a new session and another browser, while a second account remained isolated.
+
+Checkpoint 17E deployed the explicit `/auth/confirmar` flow from commit `b6e6e20`. Supabase staging
+uses Mailtrap Email Sandbox as Custom SMTP, with versioned `Confirm signup` and `Reset password`
+templates based on `RedirectTo` + `TokenHash`. Manual cross-context confirmation and password
+recovery passed; reused links were rejected without creating sessions, tokens did not remain in the
+visible URL, and `invalid_callback` did not recur. Mailtrap is staging-only and is not the future
+production transactional email configuration.

@@ -13,8 +13,9 @@ receber usuários reais sem expor seus dados ou criar uma expectativa que o prod
   navegador/dispositivo.
 - Uma sessão remota usa `RemoteFinancialRepository`, não grava workspace financeiro em
   `localStorage`, não faz dual-write e não cai silenciosamente para o modo local.
-- A seleção `local | remote` ainda é controlada no staging por uma allowlist server-side. Fora dela,
-  o comportamento atual continua local.
+- A Sprint 17 está **ENCERRADA com PASS**. Desenvolvimento e testes usam modo local explícito;
+  staging resolve `remote` por ambiente para toda sessão autenticada; configuração ausente ou
+  inválida falha fechada como indisponível. A antiga allowlist foi removida da decisão e do Worker.
 - Não existem usuários comerciais reais ou workspaces legados que precisem ser migrados.
 
 Por isso, a antiga Sprint 16F de migração assistida local → remoto está **aposentada e substituída**
@@ -35,6 +36,8 @@ conversão de IDs ou reconciliação local/remota sem uma nova necessidade compr
    existir de verdade.
 
 ## Sprint 17 — Remote-by-default e onboarding comercial
+
+**Status: ENCERRADA com PASS.**
 
 ### Objetivo
 
@@ -66,6 +69,28 @@ experiência comercial coerente, remota e honesta.
 - as mensagens de armazenamento refletem a fonte real da sessão;
 - não há promessa visível de recurso inexistente;
 - modo local permanece testável, mas não é selecionável por um usuário comercial.
+
+### Evidências de encerramento
+
+- **Código e testes:** commits `8b01222`, `ac27be4`, `7404c70` e `b6e6e20` implementam a política
+  server-authoritative por ambiente, a fronteira fail-closed, onboarding/copy/metadata honestos e
+  confirmação/recuperação por `token_hash` com ação explícita e `verifyOtp` no servidor.
+- **Staging operacional:** `SMART_FINANCE_ENVIRONMENT=staging` resolve toda conta autenticada como
+  remota. O secret legado `SMART_FINANCE_REMOTE_PILOT_USER_IDS` foi removido do Worker e não
+  participa mais da decisão financeira.
+- **Aceite manual remote-by-default:** uma conta criada depois da mudança, sem allowlist, iniciou
+  workspace remoto vazio, persistiu Project e Transaction após refresh, logout/login e outro
+  contexto de navegador. Uma segunda conta não acessou os dados da primeira.
+- **Aceite manual 17E:** cadastro iniciado em janela anônima foi confirmado em outra janela pelo
+  fluxo explícito `/auth/confirmar`; recovery iniciado em um contexto foi concluído em outro; a nova
+  senha autenticou normalmente; tokens de confirmação e recovery reutilizados foram rejeitados sem
+  criar sessão. Não ocorreu `invalid_callback`.
+- **E-mail de staging:** Mailtrap Email Sandbox está configurado como Custom SMTP somente no
+  Supabase staging. Os templates `Confirm signup` e `Reset password` usam os arquivos versionados
+  com `RedirectTo` + `TokenHash`. Isso é infraestrutura de teste e não substitui o SMTP de produção.
+
+Nenhum workspace financeiro remoto é gravado em `localStorage`, não existe dual-write e falhas
+remotas não acionam fallback local. Não houve migração automática de usuários ou dados locais.
 
 ## Sprint 18 — Ciclo de vida da conta e LGPD
 
@@ -271,10 +296,11 @@ Salvo nova justificativa baseada em necessidade real, não são requisitos:
 
 ## Ordem oficial
 
-1. Sprint 17 — Remote-by-default e onboarding comercial;
+1. Sprint 17 — Remote-by-default e onboarding comercial — **encerrada com PASS**;
 2. Sprint 18 — Ciclo de vida da conta e LGPD;
 3. Sprint 19 — Confiabilidade, segurança e operação;
 4. Sprint 20 — Produção real e Branding/Web Launch Polish;
 5. Sprint 21 — Monetização e lançamento comercial.
 
-A próxima implementação é a Sprint 17. Nenhuma parte dela é implementada por este documento.
+A próxima implementação é a Sprint 18 — Ciclo de vida da conta e LGPD. Produção, domínio e SMTP
+transacional definitivo permanecem na Sprint 20; o Mailtrap atual atende somente ao staging.

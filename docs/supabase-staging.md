@@ -2,9 +2,10 @@
 
 This runbook records the staging environment that Sprint 15 originally delivered without making it
 a financial data source. **Sprint 15 is CLOSED. Cloudflare Access is consciously deferred and documented;
-Cloudflare Access is not complete.** Sprint 16E subsequently enabled one disposable remote pilot
-behind a server-only allowlist. Accounts outside that allowlist continue to use their isolated local
-workspace.
+Cloudflare Access is not complete.** Sprint 16E subsequently validated one disposable remote pilot.
+Sprint 17 is now **CLOSED with PASS**: staging is remote-by-default for authenticated sessions, the
+legacy allowlist was retired, and missing or invalid financial-environment configuration fails
+closed instead of selecting local mode.
 
 ## Sprint 15 closure status
 
@@ -24,11 +25,11 @@ No service-role, admin or database credential is part of the application runtime
 
 ## Ownership and environment decisions
 
-The financial-mode pilot allowlist is a server-only configuration named
-`SMART_FINANCE_REMOTE_PILOT_USER_IDS`. It remains empty by default and must not be exposed as a
-`VITE_` variable or contain a real identity in versioned files. Missing or invalid configuration
-selects local mode. Sprint 16E-D enabled one disposable staging account only after migration review
-and remote RLS/RPC validation. There is no automatic remote-to-local fallback and no dual-write.
+Financial mode is derived server-side from `SMART_FINANCE_ENVIRONMENT`. In staging it must equal
+`staging`, which resolves authenticated sessions to remote mode. Missing or unknown values resolve
+to unavailable, never local. The legacy `SMART_FINANCE_REMOTE_PILOT_USER_IDS` secret was removed
+from the staging Worker after Sprint 17 deployment. Identity, query parameters and browser storage
+cannot select the repository. There is no automatic remote-to-local fallback and no dual-write.
 
 - The project must belong to the organization controlled by the Smart Finance owner.
 - The sole administrator must enable MFA before creating or linking the project.
@@ -91,7 +92,7 @@ against production.
 The deployed runtime passed signup confirmation, PKCE callback, session refresh, logout, anonymous
 route protection and password recovery/reset manual checks. At Sprint 15 closure the financial UI
 remained local and was not connected or dual-written to PostgreSQL; Sprint 16E later added the
-allowlist-controlled remote pilot described below.
+controlled remote pilot described below; Sprint 17 later promoted staging to remote-by-default.
 
 ## Cloudflare Access decision
 
@@ -107,7 +108,7 @@ reconsidered before commercial/production exposure or broader staging access. `X
 
 The following commercial capabilities remain intentionally outside Sprint 15:
 
-- commercial remote-by-default rollout under Sprint 17; no legacy migration is currently planned;
+- production remote-by-default rollout; staging completed remote-by-default under Sprint 17;
 - separate production Supabase and Cloudflare environments;
 - permanent domain and transactional SMTP;
 - rate limiting, production observability and alerting;
@@ -125,7 +126,8 @@ Sprint 16A moved local persistence behind `FinancialRepository` without changing
 stored data. Sprint 16B added authenticated remote Projects; 16C added versioned Transactions; 16D
 added transactional, idempotent import RPCs; and 16E composed a coherent remote snapshot,
 preferences and `RemoteFinancialRepository`. The server now assigns exactly one source per session.
-Local remains the default, while only allowlisted staging pilots receive remote mode.
+Local remains available only for explicit development/test environments. Staging is
+remote-by-default; absent or invalid environment configuration is unavailable rather than local.
 
 ## Sprint 16E-D6 acceptance and closure
 
@@ -143,7 +145,8 @@ Sprint 16E-D6 and Sprint 16E are **CLOSED with PASS**. No known functional block
   filters, visible columns, deletion/cancellation, report CSV and printing also passed.
 - **Source isolation evidence:** offline use did not fall back to a local workspace, reconnecting
   restored the remote workspace, and inspection found no financial workspace in `localStorage`.
-  Remote mode does not dual-write. Accounts outside the server allowlist remain local.
+  Remote mode does not dual-write. Sprint 17 removed the staging allowlist and did not introduce a
+  local fallback.
 - **Preferences evidence:** visible columns persisted after refresh and across devices. The
   `activeProjectId` refresh defect was corrected in commit `5a03169` and manually retested with PASS.
   Active Project selection is intentionally a per-device interface preference and may differ across
@@ -152,7 +155,25 @@ Sprint 16E-D6 and Sprint 16E are **CLOSED with PASS**. No known functional block
 There was no automatic migration of existing users or local data. No commercial legacy users exist,
 so the former assisted local-to-remote Sprint 16F has been retired rather than implemented without
 a demonstrated migration need. `docs/commercial-roadmap.md` is now the roadmap source of truth;
-Sprint 17, remote-by-default and commercial onboarding, is the next implementation checkpoint.
+Sprint 17, remote-by-default and commercial onboarding, is closed with PASS. Sprint 18, account
+lifecycle and LGPD, is the next implementation checkpoint.
+
+## Sprint 17 closure and cross-context Auth acceptance
+
+Sprint 17A-D replaced allowlist selection with an explicit environment policy, integrated the
+fail-closed authenticated journey, completed minimum onboarding/copy/metadata work and promoted
+remote-by-default to staging. A newly created, never-allowlisted account received an empty remote
+workspace and retained UI-created financial data across refresh, logout/login and another browser.
+Cross-account isolation remained intact.
+
+Sprint 17E replaced email-link dependence on a browser-local PKCE verifier with an explicit
+`token_hash` confirmation surface and server-side `verifyOtp`. Mailtrap Email Sandbox is configured
+as staging-only Custom SMTP, and only the `Confirm signup` and `Reset password` templates were
+updated to their versioned `RedirectTo` + `TokenHash` forms. Manual acceptance proved confirmation
+and recovery across different browser contexts, successful password replacement and sanitized
+rejection of reused confirmation and recovery links. Tokens were removed from the visible URL and
+no `invalid_callback` occurred. Production still requires its own transactional SMTP, sender/domain
+and deliverability configuration.
 
 ## Rollback rules
 

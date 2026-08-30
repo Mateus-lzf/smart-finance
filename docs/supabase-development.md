@@ -7,8 +7,9 @@ inactive repository. Sprint 16C adds an equally inactive, versioned Transaction 
 unitary CRUD. Sprint 16D adds an inactive `ImportRepository` and transactional PostgreSQL RPCs for
 idempotent initial imports and updates. Sprint 16E composes those boundaries into a complete
 `RemoteFinancialRepository` and closes the controlled staging pilot. Each authenticated session
-uses exactly one financial source: `LocalFinancialRepository` by default or
-`RemoteFinancialRepository` only when selected by the server-side pilot allowlist.
+uses exactly one financial source. Explicit development/test environments use
+`LocalFinancialRepository`; staging and future production use `RemoteFinancialRepository`; missing
+or invalid environment configuration is unavailable.
 
 ## Prerequisites
 
@@ -114,9 +115,9 @@ not accepted as authority from client input.
 
 The browser client is the SSR-compatible user-session client. Sprint 14B2 completed the Auth UI,
 server-aware route protection, PKCE callbacks, password recovery and logout. It remains separate
-from the financial AppStore. Remote financial persistence is available only to the controlled
-pilot. The former assisted local-data migration Sprint 16F was retired because there are no
-commercial legacy users; the commercial roadmap now starts with remote-by-default in Sprint 17.
+from the financial AppStore. Sprint 17 completed remote-by-default staging and retired the pilot
+allowlist. The former assisted local-data migration Sprint 16F was retired because there are no
+commercial legacy users; the commercial roadmap continues with Sprint 18.
 
 Existing local financial data is not uploaded, associated with an account, copied, renamed, or
 removed automatically. Authentication and financial application state intentionally remain
@@ -143,26 +144,29 @@ npm run dev:staging
 
 The financial product UI still reads only the AppStore facade, which receives one repository for
 the authenticated session. Selecting the staging Auth endpoint alone does not migrate or upload
-projects and transactions. Accounts outside the allowlist remain local; an allowlisted pilot uses
-only the remote repository. There is no dual-write.
+pre-existing local projects and transactions. Staging resolves remote by environment for every
+authenticated account. There is no dual-write or remote-to-local fallback.
 
-## Financial mode pilot configuration
+## Financial mode environment policy
 
-Sprint 16E-C introduced one financial source per authenticated session. The server resolves
-`local | remote` from `SMART_FINANCE_REMOTE_PILOT_USER_IDS`, a server-only comma-separated list of
-Supabase Auth user UUIDs. Missing, empty, malformed, duplicated or oversized configuration fails
-closed to `local`. The browser cannot choose or override the mode, and the variable must never use
-the `VITE_` prefix.
+Sprint 16E-C introduced one financial source per authenticated session. Sprint 17A replaced the
+pilot allowlist with the server-only `SMART_FINANCE_ENVIRONMENT` policy:
+
+- `development` and test resolve local;
+- `staging` and future `production` resolve remote;
+- missing or unknown values resolve unavailable.
+
+The browser, user identity, query string and storage cannot choose or override the mode. Production
+can never resolve local.
 
 For local verification, use only disposable users from the local Supabase instance in the ignored
 `.env.local` file. No identity is versioned. A remote session never reads or writes financial
 localStorage and never falls back to it after a network or authorization error. A local session
 continues to use the existing per-user local repository and performs no remote financial write.
 
-Versioned examples keep the allowlist empty and never contain a pilot identity. Sprint 16E-D
-promoted the reviewed migrations, validated the remote financial matrix, deployed with the pilot
-disabled and then enabled exactly one disposable account through the server-only staging binding.
-The pilot remains allowlist-controlled.
+Sprint 17D promoted remote-by-default to staging and removed the legacy
+`SMART_FINANCE_REMOTE_PILOT_USER_IDS` Worker secret after confirming that the deployed code no
+longer read it. No identity is versioned.
 
 ## Remote staging safety guard
 
@@ -269,7 +273,7 @@ origin:
 - **Automated evidence:** local repository, remote repository, financial-mode, Auth/RLS and remote
   staging matrices cover ownership, A/B isolation, optimistic concurrency, atomic imports,
   idempotency, preference versions, absence of CRUD import loops and absence of automatic fallback.
-- **Manual staging evidence:** the allowlisted account created and managed Projects and
+- **Manual staging evidence:** the original pilot account created and managed Projects and
   Transactions through the UI; CSV and XLSX import and reimport covered added, changed and removed
   rows, legitimate duplicates, manual rows and manually edited imported rows. Dashboard, Data,
   Insights and Reports used the same remote source. Refresh, another browser and a mobile device
@@ -287,6 +291,18 @@ differ between devices and is not a financial workspace or a remote synchronizat
 
 No known functional blocker remains for Sprint 16E. No commercial legacy users exist, so the former
 assisted local-to-remote Sprint 16F was retired rather than implemented speculatively. The roadmap
-continues in `docs/commercial-roadmap.md`; Sprint 17 is the next implementation checkpoint and will
-make remote persistence the safe commercial default while preserving local mode only for an
-explicit development/test purpose.
+continues in `docs/commercial-roadmap.md`; Sprint 17 is closed with PASS and Sprint 18 is the next
+implementation checkpoint.
+
+## Sprint 17 closure
+
+Sprint 17A-D established the environment policy, fail-closed financial boundary, honest first-use
+experience and staging remote-by-default behavior. Manual staging acceptance proved that a newly
+created account without allowlist history received an empty remote workspace, persisted UI-created
+data across refresh/login/browser contexts and remained isolated from another account.
+
+Sprint 17E added explicit `token_hash` confirmation and recovery through server-side `verifyOtp`.
+The local Auth integration covers expiration, reuse, resend and safe redirects. Staging uses
+Mailtrap Email Sandbox only for Auth testing; manual acceptance proved signup confirmation and
+password recovery across different browser contexts, successful login with the replaced password
+and rejection of reused links. This sandbox does not replace production SMTP.
