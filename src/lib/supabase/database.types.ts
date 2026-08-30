@@ -344,6 +344,7 @@ export type Database = {
         };
         Returns: boolean;
       };
+      export_account_data_v1: { Args: never; Returns: Json };
       load_financial_workspace: { Args: never; Returns: Json };
       update_financial_transaction: {
         Args: {
