@@ -94,6 +94,14 @@ remotas não acionam fallback local. Não houve migração automática de usuár
 
 ## Sprint 18 — Ciclo de vida da conta e LGPD
 
+**Status: em andamento. Checkpoint 18A concluído; 18B-18F pendentes.**
+
+As decisões técnicas e de produto da 18A estão registradas em
+[`docs/account-data-lifecycle.md`](account-data-lifecycle.md). Esse registro orienta a implementação,
+mas não constitui parecer jurídico nem torna definitivos controlador, contatos, prazos de retenção,
+Política de Privacidade ou Termos de Uso. Esses itens permanecem bloqueadores explícitos da 18E e
+do encerramento da Sprint 18.
+
 ### Objetivo
 
 Dar ao usuário controle real sobre sua conta e seus dados e publicar a base jurídica/comercial
@@ -124,6 +132,21 @@ adotadas futuramente e a análise jurídica exigirem.
 - Privacidade, Termos, contato e direitos do titular estão publicados e acessíveis antes do cadastro;
 - cookies/storage necessários estão descritos com finalidade e duração;
 - nenhum analytics opcional é ativado sem a base legal/consentimento necessário.
+
+### Checkpoints
+
+1. **18A — Inventário e decisões de ciclo de vida — concluído:** escopo de dados, exportação v1,
+   exclusão imediata, retenção conhecida/pendente, storages, mercado, idade e fornecedores foram
+   classificados sem inventar informações jurídicas.
+2. **18B — Exportação integral e portabilidade — pendente.**
+3. **18C — Exclusão segura no servidor e banco — pendente.**
+4. **18D — Experiência de conta, exportação e exclusão — pendente.**
+5. **18E — Privacidade, Termos, suporte e storages — pendente e dependente das definições formais e
+   da revisão jurídica registradas na 18A.**
+6. **18F — Promoção e aceite integral em staging — pendente.**
+
+O próximo checkpoint é a 18B. A conclusão documental da 18A não antecipa exportação, exclusão,
+conformidade jurídica, operação de backups, produção ou monetização.
 
 ## Sprint 19 — Confiabilidade, segurança e operação
 
