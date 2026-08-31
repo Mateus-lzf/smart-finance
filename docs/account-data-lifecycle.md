@@ -11,10 +11,11 @@ antes de decisão do responsável pelo produto e revisão competente.
 - Sprint 17: encerrada com PASS.
 - Sprint 18: aberta.
 - Checkpoint 18A: decisões aprovadas e documentadas.
-- Próximo checkpoint: 18B, exportação integral e portabilidade.
-- Nenhuma funcionalidade de exportação, correção cadastral ou exclusão de conta foi implementada
-  pela 18A.
-- Nenhuma configuração, schema, migration, RLS ou ambiente remoto foi alterado pela 18A.
+- Checkpoint 18B: exportação integral e portabilidade concluída com PASS local e no staging.
+- Próximo checkpoint: 18C, exclusão segura no servidor e banco.
+- Correção cadastral e exclusão de conta ainda não foram implementadas.
+- A 18B adicionou e promoveu somente a infraestrutura de exportação descrita neste documento; não
+  alterou as policies RLS existentes nem antecipou exclusão, textos jurídicos ou produção.
 
 ## Classificação das decisões
 
@@ -25,7 +26,7 @@ antes de decisão do responsável pelo produto e revisão competente.
 - dados permanecem no banco ativo enquanto a conta estiver ativa;
 - exclusão imediata e irreversível dos dados ativos, após reautenticação e confirmação forte;
 - recomendação de exportação antes da exclusão;
-- exportação em ZIP versionado, com JSON integral e CSVs legíveis;
+- exportação em ZIP versionado cuja composição de JSONs e CSVs legíveis forma o pacote integral;
 - nome editável no produto e alteração de e-mail inicialmente mediada por suporte;
 - Supabase e Cloudflare classificados preliminarmente como serviços operacionais essenciais;
 - Mailtrap restrito a testes no staging;
@@ -78,10 +79,10 @@ do Checkpoint 18E e da Sprint 18.
 Tokens, senhas, hashes, cookies, secrets, credenciais administrativas e material de sessão nunca
 fazem parte da portabilidade.
 
-## Contrato conceitual da exportação v1
+## Contrato implementado da exportação v1
 
-A opção aprovada é um arquivo ZIP gerado sob demanda e não armazenado permanentemente pelo servidor.
-A estrutura inicial prevista é:
+A exportação é um arquivo ZIP gerado sob demanda, mantido apenas em memória durante a resposta e
+não armazenado permanentemente pelo servidor ou pelo produto. A estrutura implementada é:
 
 ```text
 smart-finance-export-v1-AAAA-MM-DD.zip
@@ -95,7 +96,7 @@ smart-finance-export-v1-AAAA-MM-DD.zip
 └── project-preferences.json
 ```
 
-O contrato campo a campo será definido na 18B, respeitando estas decisões:
+O contrato v1 implementado preserva estas decisões:
 
 - `manifest.json` identifica a versão do formato e o momento da geração;
 - `account.json` contém somente dados de identidade portáveis e não secretos;
@@ -110,6 +111,29 @@ O contrato campo a campo será definido na 18B, respeitando estas decisões:
 - nenhum `user_id` enviado pelo browser será aceito como autoridade;
 - a exportação será protegida pela sessão real e por RLS;
 - respostas e arquivos financeiros não podem ser incluídos em cache compartilhado ou logs.
+
+### Implementação e validação da 18B
+
+- `public.export_account_data_v1()` não recebe argumentos, deriva a identidade exclusivamente de
+  `auth.uid()`, é `STABLE`, `SECURITY INVOKER`, usa `search_path = pg_catalog` e mantém RLS como
+  barreira final;
+- `EXECUTE` é concedido somente a `authenticated`; `anon` e `PUBLIC` não possuem execução;
+- os limites técnicos provisórios são 100 Projects, 25.000 Transactions, 256 KiB por
+  `additional_data` e 20 MiB para o conteúdo exportável antes da compressão;
+- o endpoint autenticado `POST /api/account/export` obtém a identidade por `auth.getUser()`, chama a
+  RPC sem aceitar ownership do browser, revalida o snapshot e devolve ZIP binário sem Base64;
+- respostas usam `Cache-Control: no-store`, `Pragma: no-cache`, `Expires: 0` e `nosniff`; o ZIP não
+  é persistido em banco, filesystem, estado React ou storage do navegador;
+- as migrations `202608300001_create_account_export_snapshot.sql` e
+  `202608300002_limit_account_export_transfer_size.sql` foram promovidas ao staging, cujo plano de
+  migrations ficou vazio;
+- testes locais com sessões reais comprovaram isolamento A↔B, RLS, conta vazia, conta com dados,
+  headers, conteúdo, precisão monetária, datas e ausência de material secreto;
+- o aceite manual no staging confirmou os oito arquivos para uma conta vazia e, para uma conta com
+  dados, o Project e a Transaction esperados, seus relacionamentos, moeda, origem, data e valor;
+- o painel **Seus dados** e o botão **Baixar meus dados**, originalmente reservados à experiência da
+  18D, foram antecipados para a 18B4 e fazem parte do PASS da 18B. Edição cadastral e exclusão
+  permanecem pendentes.
 
 ## Exclusão da conta
 
@@ -212,9 +236,10 @@ Antes de publicar Política de Privacidade e Termos como definitivos, será nece
 
 ## Fronteira com as próximas Sprints
 
-- 18B implementará exportação integral e portabilidade.
+- 18B implementou e validou a exportação integral e portabilidade no staging.
 - 18C implementará e provará a exclusão segura no servidor e no banco.
-- 18D implementará a experiência de exportação, correção de nome e exclusão em Configurações.
+- 18D implementará correção de nome e exclusão em Configurações; a experiência de exportação já foi
+  antecipada e concluída na 18B4.
 - 18E publicará Privacidade, Termos, suporte e explicações de storage somente após resolver seus
   bloqueios.
 - 18F promoverá e validará a Sprint 18 em staging.
@@ -223,4 +248,5 @@ Antes de publicar Política de Privacidade e Termos como definitivos, será nece
 - Sprint 20 tratará produção, domínio, SMTP transacional, branding e reavaliação de Google Fonts.
 - Sprint 21 tratará monetização.
 
-Nenhuma decisão deste documento declara concluída uma capacidade reservada às Sprints 18B-21.
+O PASS da 18B declara concluída somente a exportação e portabilidade. Nenhuma capacidade reservada
+à 18C-21 é antecipada por este documento.
