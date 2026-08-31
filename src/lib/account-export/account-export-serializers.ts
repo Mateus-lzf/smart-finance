@@ -15,6 +15,7 @@ export const ACCOUNT_EXPORT_V1_FILES = [
 
 export type AccountExportV1FileName = (typeof ACCOUNT_EXPORT_V1_FILES)[number];
 export type AccountExportV1Files = Record<AccountExportV1FileName, string>;
+export const ACCOUNT_EXPORT_V1_MAX_UNCOMPRESSED_BYTES = 20 * 1024 * 1024;
 
 // ZIP timestamps use local calendar fields; midday keeps the value inside the
 // format's 1980 lower bound in negative UTC offsets as well.
@@ -230,8 +231,18 @@ export function createAccountExportV1Files(
   };
 }
 
-export function createAccountExportV1Zip(input: AccountExportV1, generatedAt: string) {
-  const files = createAccountExportV1Files(input, generatedAt);
+export function measureAccountExportV1Files(files: AccountExportV1Files) {
+  const encoder = new TextEncoder();
+  return ACCOUNT_EXPORT_V1_FILES.reduce(
+    (total, name) => total + encoder.encode(files[name]).byteLength,
+    0,
+  );
+}
+
+export function createAccountExportV1ZipFromFiles(
+  files: AccountExportV1Files,
+  generatedAt: string,
+) {
   const zipInput: Zippable = {};
   for (const name of ACCOUNT_EXPORT_V1_FILES) {
     zipInput[name] = [strToU8(files[name]), { level: 6, mtime: ZIP_TIMESTAMP }];
@@ -242,4 +253,11 @@ export function createAccountExportV1Zip(input: AccountExportV1, generatedAt: st
     fileName: `smart-finance-export-v1-${new Date(generatedAt).toISOString().slice(0, 10)}.zip`,
     files,
   };
+}
+
+export function createAccountExportV1Zip(input: AccountExportV1, generatedAt: string) {
+  return createAccountExportV1ZipFromFiles(
+    createAccountExportV1Files(input, generatedAt),
+    generatedAt,
+  );
 }
