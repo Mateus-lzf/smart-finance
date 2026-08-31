@@ -4,10 +4,50 @@ import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { createClientRpc } from "@tanstack/start-client-core/client-rpc";
 import { runWithStartContext } from "@tanstack/start-storage-context";
+import { strFromU8, unzipSync } from "fflate";
 import { createServer } from "vite";
 
 const APP_ORIGIN = "http://127.0.0.1:3000";
+const ACCOUNT_EXPORT_FILES = [
+  "README.txt",
+  "manifest.json",
+  "account.json",
+  "projects.csv",
+  "transactions.csv",
+  "import-profiles.json",
+  "import-runs.csv",
+  "project-preferences.json",
+].sort();
 process.env.TSS_SERVER_FN_BASE = "/_serverFn/";
+
+async function readAccountExport(response) {
+  assert.equal(response.status, 200, "account export succeeds");
+  assert.equal(response.headers.get("content-type"), "application/zip");
+  assert.match(
+    response.headers.get("content-disposition") ?? "",
+    /^attachment; filename="smart-finance-export-v1-\d{4}-\d{2}-\d{2}\.zip"$/,
+  );
+  assert.match(response.headers.get("cache-control") ?? "", /(?:^|,\s*)no-store(?:,|$)/);
+  assert.equal(response.headers.get("pragma"), "no-cache");
+  assert.equal(response.headers.get("expires"), "0");
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  assert.deepEqual([...bytes.slice(0, 2)], [0x50, 0x4b], "response contains ZIP bytes");
+  const archive = unzipSync(bytes);
+  assert.deepEqual(
+    Object.keys(archive).sort(),
+    ACCOUNT_EXPORT_FILES,
+    "ZIP contains all eight files",
+  );
+  return Object.fromEntries(
+    Object.entries(archive).map(([name, contents]) => [name, strFromU8(contents)]),
+  );
+}
+
+function joinedExport(files) {
+  return Object.values(files).join("\n");
+}
 
 function readLocalSupabaseStatus() {
   const command =
@@ -154,6 +194,7 @@ try {
     fetch(`${APP_ORIGIN}/src/lib/projects/project-functions.ts`),
     fetch(`${APP_ORIGIN}/src/lib/transactions/transaction-functions.ts`),
     fetch(`${APP_ORIGIN}/src/lib/imports/import-functions.ts`),
+    fetch(`${APP_ORIGIN}/src/lib/preferences/preference-functions.ts`),
   ]);
 
   Object.assign(process.env, {
@@ -169,6 +210,9 @@ try {
     await vite.ssrLoadModule("/src/lib/transactions/transaction-functions.ts"),
   );
   const imports = createRpcModule(await vite.ssrLoadModule("/src/lib/imports/import-functions.ts"));
+  const preferences = createRpcModule(
+    await vite.ssrLoadModule("/src/lib/preferences/preference-functions.ts"),
+  );
 
   await runWithStartContext({ startOptions: {} }, async () => {
     const runtimeSources = await Promise.all([
@@ -180,6 +224,10 @@ try {
       readFile("src/lib/transactions/supabase-transaction-store.ts", "utf8"),
       readFile("src/lib/imports/import-functions.ts", "utf8"),
       readFile("src/lib/imports/supabase-import-store.ts", "utf8"),
+      readFile("src/lib/preferences/preference-functions.ts", "utf8"),
+      readFile("src/lib/preferences/supabase-preference-store.ts", "utf8"),
+      readFile("src/lib/account-export/account-export-server.ts", "utf8"),
+      readFile("src/lib/account-export/account-export-http.ts", "utf8"),
       readFile("src/lib/supabase/server-client.ts", "utf8"),
     ]);
     assert.doesNotMatch(
@@ -204,6 +252,32 @@ try {
     });
 
     const anonymous = createCookieFetch();
+    const missingOriginExport = await fetch(`${APP_ORIGIN}/api/account/export`, {
+      method: "POST",
+      redirect: "manual",
+    });
+    assert.equal(missingOriginExport.status, 403, "export requires an Origin header");
+    assert.equal((await missingOriginExport.json()).error, "request_forbidden");
+    const invalidOriginExport = await fetch(`${APP_ORIGIN}/api/account/export`, {
+      method: "POST",
+      headers: { Origin: "https://evil.example" },
+      redirect: "manual",
+    });
+    assert.equal(invalidOriginExport.status, 403, "export rejects a foreign Origin");
+    assert.equal((await invalidOriginExport.json()).error, "request_forbidden");
+    const invalidMethodExport = await fetch(`${APP_ORIGIN}/api/account/export`, {
+      method: "GET",
+      headers: { Origin: APP_ORIGIN },
+      redirect: "manual",
+    });
+    assert.equal(invalidMethodExport.status, 405, "export accepts only POST");
+    assert.equal(invalidMethodExport.headers.get("allow"), "POST");
+    const anonymousExport = await anonymous.request("/api/account/export", {
+      method: "POST",
+      headers: { Accept: "application/zip" },
+    });
+    assert.equal(anonymousExport.status, 401, "export rejects an anonymous session");
+    assert.equal((await anonymousExport.json()).error, "authentication_required");
     const privateWithoutSession = await anonymous.request("/dashboard");
     assert.ok(
       [302, 307].includes(privateWithoutSession.status),
@@ -334,6 +408,23 @@ try {
       assert.ok(clients[index].cookies.size > 0, `session cookies exist for user ${index + 1}`);
       const current = await auth.getCurrentUser({ fetch: clients[index].request });
       assert.equal(current.email, accounts[index].email, `server validates user ${index + 1}`);
+
+      const emptyExport = await readAccountExport(
+        await clients[index].request("/api/account/export", {
+          method: "POST",
+          headers: { Accept: "application/zip" },
+        }),
+      );
+      assert.equal(JSON.parse(emptyExport["account.json"]).email, accounts[index].email);
+      assert.deepEqual(JSON.parse(emptyExport["manifest.json"]).counts, {
+        projects: 0,
+        transactions: 0,
+        importProfiles: 0,
+        importRuns: 0,
+        projectPreferences: 0,
+      });
+      assert.equal(emptyExport["projects.csv"].trim().split(/\r?\n/).length, 1);
+      assert.equal(emptyExport["transactions.csv"].trim().split(/\r?\n/).length, 1);
     }
 
     const authenticatedRoot = await clients[0].request("/");
@@ -385,6 +476,12 @@ try {
       null,
       "invalid session token is rejected safely",
     );
+    const invalidSessionExport = await invalidSession.request("/api/account/export", {
+      method: "POST",
+      headers: { Accept: "application/zip" },
+    });
+    assert.equal(invalidSessionExport.status, 401, "expired export session is rejected");
+    assert.equal((await invalidSessionExport.json()).error, "authentication_required");
     await assert.rejects(
       () => projects.listRemoteProjects({ fetch: invalidSession.request }),
       /Server Function rejected the request/,
@@ -522,6 +619,19 @@ try {
       { ok: false, code: "project_not_found" },
       "user B cannot prepare an import against user A project",
     );
+    for (let index = 0; index < clients.length; index += 1) {
+      const savedPreference = await preferences.updateRemoteProjectPreferences({
+        data: {
+          projectId: importedProjects[index].projectId,
+          expectedVersion: null,
+          visibleColumns: ["date", "description", "amount", "filial"],
+          analyticDimensions: ["filial"],
+        },
+        fetch: clients[index].request,
+      });
+      assert.equal(savedPreference.ok, true, `preferences are saved for user ${index + 1}`);
+      assert.equal(savedPreference.data.version, 1);
+    }
 
     for (const [actor, target] of [
       [clients[0], projectB],
@@ -724,6 +834,83 @@ try {
       createdManualA1.data.transaction.id,
       createdManualA2.data.transaction.id,
       "identical legitimate occurrences receive distinct UUIDs",
+    );
+
+    const exports = [];
+    for (let index = 0; index < clients.length; index += 1) {
+      exports.push(
+        await readAccountExport(
+          await clients[index].request("/api/account/export", {
+            method: "POST",
+            headers: { Accept: "application/zip" },
+          }),
+        ),
+      );
+      assert.equal(JSON.parse(exports[index]["account.json"]).email, accounts[index].email);
+      const manifest = JSON.parse(exports[index]["manifest.json"]);
+      assert.ok(manifest.counts.projects >= 2);
+      assert.ok(manifest.counts.transactions >= 3);
+      assert.equal(manifest.counts.importProfiles, 1);
+      assert.equal(manifest.counts.importRuns, 1);
+      assert.equal(manifest.counts.projectPreferences, 1);
+      assert.match(exports[index]["import-profiles.json"], /"schemaVersion": 1/);
+      assert.match(exports[index]["project-preferences.json"], /"filial"/);
+      assert.match(exports[index]["import-runs.csv"], /completed/);
+    }
+    const exportA = joinedExport(exports[0]);
+    const exportB = joinedExport(exports[1]);
+    assert.match(exportA, /Projeto remoto A alterado/);
+    assert.match(exportA, /2026-08-01/);
+    assert.match(exportA, /125,50/);
+    assert.match(exportA, /Fortaleza/);
+    assert.doesNotMatch(
+      exportA,
+      new RegExp(accounts[1].email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+    assert.doesNotMatch(exportA, /Projeto remoto B|Despesa B/);
+    assert.match(exportB, /Projeto remoto B/);
+    assert.match(exportB, /2026-08-02/);
+    assert.match(exportB, /50,25/);
+    assert.doesNotMatch(
+      exportB,
+      new RegExp(accounts[0].email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+    assert.doesNotMatch(exportB, /Projeto remoto A alterado|Venda id.ntica/);
+    for (const text of exports.map(joinedExport)) {
+      for (const forbidden of [
+        "access_token",
+        "refresh_token",
+        "password_hash",
+        "encrypted_password",
+        "service_role",
+        "idempotency_key",
+        "request_hash",
+        "set-cookie",
+      ]) {
+        assert.doesNotMatch(text, new RegExp(forbidden, "i"));
+      }
+      assert.doesNotMatch(text, /SenhaSegura[AB]123!/);
+    }
+
+    const ownershipAttempt = await readAccountExport(
+      await clients[0].request(
+        `/api/account/export?user_id=${encodeURIComponent(accounts[1].email)}&owner_user_id=forged`,
+        {
+          method: "POST",
+          headers: { Accept: "application/zip", "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: accounts[1].email, owner_user_id: "forged" }),
+        },
+      ),
+    );
+    const ownershipAttemptText = joinedExport(ownershipAttempt);
+    assert.match(
+      ownershipAttemptText,
+      new RegExp(accounts[0].email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+    assert.doesNotMatch(
+      ownershipAttemptText,
+      new RegExp(accounts[1].email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      "ownership parameters cannot select another account",
     );
 
     const transactionListA = await transactions.listRemoteTransactions({
