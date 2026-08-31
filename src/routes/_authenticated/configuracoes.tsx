@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useApp } from "@/lib/app-store";
+import { AccountDataExport } from "@/components/account/account-data-export";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
@@ -107,6 +108,8 @@ function ConfigPage() {
             </div>
           </div>
         </Panel>
+
+        {financialMode === "remote" && <AccountDataExport />}
 
         <Panel title="Tema" subtitle="Escolha como a interface aparece para você">
           <div className="flex gap-3">
