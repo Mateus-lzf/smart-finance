@@ -336,6 +336,7 @@ export type Database = {
           isSetofReturn: true;
         };
       };
+      delete_current_account: { Args: never; Returns: boolean };
       delete_financial_transaction: {
         Args: {
           p_expected_version: number;
