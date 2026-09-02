@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useApp } from "@/lib/app-store";
 import { AccountDataExport } from "@/components/account/account-data-export";
+import { AccountDeletion } from "@/components/account/account-deletion";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   head: () => ({
@@ -136,6 +137,8 @@ function ConfigPage() {
             ))}
           </div>
         </Panel>
+
+        {financialMode === "remote" && <AccountDeletion />}
       </div>
     </AppShell>
   );
