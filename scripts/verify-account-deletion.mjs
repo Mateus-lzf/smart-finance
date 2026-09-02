@@ -40,8 +40,8 @@ function createClient({
   };
 }
 
-function request(body, { method = "POST", requestOrigin = origin } = {}) {
-  return new Request(`${origin}/api/account/delete`, {
+function request(body, { method = "POST", requestOrigin = origin, query = "" } = {}) {
+  return new Request(`${origin}/api/account/delete${query}`, {
     method,
     headers: { Origin: requestOrigin, "Content-Type": "application/json" },
     ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
@@ -139,14 +139,21 @@ try {
   assert.equal(response.headers.get("expires"), "0");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
 
-  const invalidMethod = await http.handleAccountDeletionRequest(request(null, { method: "GET" }));
-  assert.equal(invalidMethod.status, 405);
-  assert.equal(await errorCode(invalidMethod), "method_not_allowed");
-  const invalidOrigin = await http.handleAccountDeletionRequest(
-    request({ confirmation: "EXCLUIR", password: "x" }, { requestOrigin: "https://evil.example" }),
-  );
-  assert.equal(invalidOrigin.status, 403);
-  assert.equal(await errorCode(invalidOrigin), "request_forbidden");
+  for (const method of ["GET", "PUT", "PATCH", "DELETE"]) {
+    const invalidMethod = await http.handleAccountDeletionRequest(request(null, { method }));
+    assert.equal(invalidMethod.status, 405);
+    assert.equal(await errorCode(invalidMethod), "method_not_allowed");
+    assert.equal(invalidMethod.headers.get("x-content-type-options"), "nosniff");
+  }
+  for (const requestOrigin of ["https://evil.example", "//evil.example", "not a URL"]) {
+    const invalidOrigin = await http.handleAccountDeletionRequest(
+      request({ confirmation: "EXCLUIR", password: "x" }, { requestOrigin }),
+    );
+    assert.equal(invalidOrigin.status, 403);
+    assert.equal(await errorCode(invalidOrigin), "request_forbidden");
+    assert.match(invalidOrigin.headers.get("cache-control") ?? "", /no-store/);
+    assert.equal(invalidOrigin.headers.get("x-content-type-options"), "nosniff");
+  }
   const missingOrigin = await http.handleAccountDeletionRequest(
     new Request(`${origin}/api/account/delete`, {
       method: "POST",
@@ -156,11 +163,30 @@ try {
   );
   assert.equal(missingOrigin.status, 403);
 
+  let invalidInputReachedDeletion = false;
   const invalidConfirmation = await http.handleAccountDeletionRequest(
-    request({ confirmation: "excluir", password: "x" }),
+    request({ confirmation: "excluir", password: "SenhaSegura123!" }),
+    {
+      deleteAccount: async () => {
+        invalidInputReachedDeletion = true;
+        return { ok: true, redirectTo: "/login" };
+      },
+    },
   );
   assert.equal(invalidConfirmation.status, 400);
   assert.equal(await errorCode(invalidConfirmation), "invalid_confirmation");
+  const missingPassword = await http.handleAccountDeletionRequest(
+    request({ confirmation: "EXCLUIR", password: "" }),
+    {
+      deleteAccount: async () => {
+        invalidInputReachedDeletion = true;
+        return { ok: true, redirectTo: "/login" };
+      },
+    },
+  );
+  assert.equal(missingPassword.status, 400);
+  assert.equal(await errorCode(missingPassword), "invalid_request");
+  assert.equal(invalidInputReachedDeletion, false);
   for (const body of [
     { confirmation: "EXCLUIR", password: "x", user_id: otherUser.id },
     { confirmation: "EXCLUIR", password: "x", email: otherUser.email },
@@ -170,6 +196,22 @@ try {
     assert.equal(rejected.status, 400);
     assert.equal(await errorCode(rejected), "invalid_request");
   }
+
+  let queryPassword = null;
+  const queryOwnership = await http.handleAccountDeletionRequest(
+    request(
+      { confirmation: "EXCLUIR", password: "query-safe" },
+      { query: `?user_id=${otherUser.id}&email=${encodeURIComponent(otherUser.email)}` },
+    ),
+    {
+      deleteAccount: async (password) => {
+        queryPassword = password;
+        return { ok: false, code: "authentication_required" };
+      },
+    },
+  );
+  assert.equal(queryPassword, "query-safe", "query ownership never reaches account selection");
+  assert.equal(queryOwnership.status, 401);
 
   const mappedErrors = [
     ["authentication_required", 401, "authentication_required"],
@@ -186,7 +228,12 @@ try {
       { deleteAccount: async () => ({ ok: false, code }) },
     );
     assert.equal(mapped.status, status);
-    assert.equal(await errorCode(mapped), publicCode);
+    const body = await mapped.text();
+    assert.equal(JSON.parse(body).error, publicCode);
+    assert.doesNotMatch(
+      body,
+      /select |delete from|postgres|supabase|jwt|cookie|SenhaSegura|Invalid login credentials|owner@example|stack|at\s+\w+/i,
+    );
   }
 
   const sources = await Promise.all([

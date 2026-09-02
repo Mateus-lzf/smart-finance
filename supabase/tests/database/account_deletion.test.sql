@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = public, extensions;
 
-select plan(73);
+select plan(76);
 
 select has_function('public', 'delete_current_account', array[]::text[], 'public wrapper exists');
 select has_function('private', 'delete_current_account', array[]::text[], 'private helper exists');
@@ -78,6 +78,26 @@ select is(
    where member = 'smart_finance_account_deletion_api'::regrole),
   0,
   'technical role is not a member of any more privileged role'
+);
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_auth_members
+    where roleid = 'smart_finance_account_deletion_api'::regrole
+      and member = 'postgres'::regrole
+      and admin_option
+      and not inherit_option
+      and not set_option
+  ),
+  'postgres retains administration only, with SET and INHERIT disabled'
+);
+select ok(
+  not pg_catalog.pg_has_role('postgres', 'smart_finance_account_deletion_api', 'SET'),
+  'postgres cannot SET ROLE to the technical role'
+);
+select ok(
+  not pg_catalog.pg_has_role('postgres', 'smart_finance_account_deletion_api', 'USAGE'),
+  'postgres does not inherit privileges from the technical role'
 );
 
 select ok(has_function_privilege('authenticated', 'public.delete_current_account()', 'execute'), 'authenticated can execute wrapper');

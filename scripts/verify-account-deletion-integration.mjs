@@ -34,8 +34,8 @@ function readLocalSupabaseStatus() {
   return values;
 }
 
-function createCookieFetch() {
-  const cookies = new Map();
+function createCookieFetch(initialCookies = []) {
+  const cookies = new Map(initialCookies);
   const request = async (input, init = {}) => {
     const url = new URL(typeof input === "string" ? input : input.url, APP_ORIGIN);
     const headers = new Headers(init.headers);
@@ -178,6 +178,8 @@ try {
     assert.equal(projectA.ok, true);
     assert.equal(projectB.ok, true);
 
+    const staleClientA = createCookieFetch(clients[0].cookies);
+
     const wrongPassword = await clients[0].request("/api/account/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -196,19 +198,43 @@ try {
     assert.deepEqual(await deleted.json(), { ok: true, redirectTo: "/login" });
     assert.match(deleted.headers.get("cache-control") ?? "", /no-store/);
     assert.equal(await auth.getCurrentUser({ fetch: clients[0].request }), null);
-    await assert.rejects(
-      () => projects.listRemoteProjects({ fetch: clients[0].request }),
-      /Server Function rejected/,
+    assert.equal(
+      await auth.getCurrentUser({ fetch: staleClientA.request }),
+      null,
+      "the exact pre-deletion cookie no longer authenticates",
     );
-    await assert.rejects(
+    for (const operation of [
+      () => projects.listRemoteProjects({ fetch: staleClientA.request }),
       () =>
         projects.createRemoteProject({
           data: { name: "Must not be recreated", type: "Pessoal" },
-          fetch: clients[0].request,
+          fetch: staleClientA.request,
         }),
-      /Server Function rejected/,
-      "the deleted account's old session cannot recreate financial data",
-    );
+      () =>
+        projects.updateRemoteProject({
+          data: {
+            id: projectA.data.project.id,
+            expectedVersion: 1,
+            input: { name: "Must not update" },
+          },
+          fetch: staleClientA.request,
+        }),
+      () =>
+        projects.deleteRemoteProject({
+          data: { id: projectA.data.project.id, expectedVersion: 1 },
+          fetch: staleClientA.request,
+        }),
+    ]) {
+      await assert.rejects(operation, /Server Function rejected/);
+    }
+
+    const repeatedDeletion = await clients[0].request("/api/account/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation: "EXCLUIR", password: accounts[0].password }),
+    });
+    assert.equal(repeatedDeletion.status, 401, "a consecutive deletion fails closed");
+    assert.equal((await repeatedDeletion.json()).error, "authentication_required");
 
     const currentB = await auth.getCurrentUser({ fetch: clients[1].request });
     assert.equal(currentB.id, users[1].id, "account B remains authenticated");
