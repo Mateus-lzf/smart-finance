@@ -19,6 +19,8 @@ import {
   deleteCurrentAccount,
   type AccountDeletionClientErrorCode,
 } from "@/lib/account-deletion/account-deletion-client";
+import { useAuth } from "@/lib/auth/auth-provider";
+import { removeBrowserActiveProjectPreference } from "@/lib/active-project-preference";
 
 const errorMessages: Record<AccountDeletionClientErrorCode, string> = {
   AUTHENTICATION_REQUIRED: "Sua sessão expirou. Entre novamente antes de excluir sua conta.",
@@ -35,6 +37,7 @@ const errorMessages: Record<AccountDeletionClientErrorCode, string> = {
 };
 
 export function AccountDeletion() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [password, setPassword] = useState("");
@@ -63,6 +66,7 @@ export function AccountDeletion() {
     setErrorMessage("");
     try {
       const result = await deleteCurrentAccount(confirmation, password);
+      removeBrowserActiveProjectPreference(user.id);
       clearSensitiveState();
       window.location.assign(result.redirectTo);
     } catch (error) {

@@ -10,6 +10,27 @@ function jsonResponse(status, body) {
 
 try {
   const client = await vite.ssrLoadModule("/src/lib/account-deletion/account-deletion-client.ts");
+  const activeProject = await vite.ssrLoadModule("/src/lib/active-project-preference.ts");
+
+  const values = new Map([
+    ["smart-finance.active-project.v1.user.account-a", "project-a"],
+    ["smart-finance.active-project.v1.user.account-b", "project-b"],
+    ["smart-finance.theme", "dark"],
+    ["smart-finance.local-state.v2", "legacy-global"],
+  ]);
+  const removedKeys = [];
+  const storage = {
+    removeItem(key) {
+      removedKeys.push(key);
+      values.delete(key);
+    },
+  };
+  activeProject.removeBrowserActiveProjectPreference("account-a", storage);
+  assert.deepEqual(removedKeys, ["smart-finance.active-project.v1.user.account-a"]);
+  assert.equal(values.has("smart-finance.active-project.v1.user.account-a"), false);
+  assert.equal(values.get("smart-finance.active-project.v1.user.account-b"), "project-b");
+  assert.equal(values.get("smart-finance.theme"), "dark");
+  assert.equal(values.get("smart-finance.local-state.v2"), "legacy-global");
 
   const requests = [];
   const success = await client.deleteCurrentAccount("EXCLUIR", "senha-ficticia", {
@@ -91,6 +112,11 @@ try {
   assert.match(component, /aria-live=["']polite["']/);
   assert.match(component, /max-h-\[calc\(100dvh-2rem\)\]/);
   assert.match(component, /window\.location\.assign\(result\.redirectTo\)/);
+  assert.match(
+    component,
+    /await deleteCurrentAccount\(confirmation, password\);[\s\S]*removeBrowserActiveProjectPreference\(user\.id\);[\s\S]*window\.location\.assign\(result\.redirectTo\)/,
+  );
+  assert.equal((component.match(/removeBrowserActiveProjectPreference\(/g) ?? []).length, 1);
   assert.match(component, /A senha informada está incorreta/);
   assert.doesNotMatch(`${component}\n${clientSource}`, /localStorage|sessionStorage|indexedDB/i);
   assert.doesNotMatch(component, /console\.|Supabase|service_role|SQL|token/i);

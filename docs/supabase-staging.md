@@ -113,7 +113,8 @@ The following commercial capabilities remain intentionally outside Sprint 15:
 - permanent domain and transactional SMTP;
 - rate limiting, production observability and alerting;
 - tested backup, recovery and operational rollback;
-- account data export and deletion, privacy and LGPD procedures;
+- account deletion acceptance, privacy and LGPD procedures; account data export was promoted and
+  accepted during Sprint 18B;
 - production secret management and rotation;
 - an appropriate staging/production edge-access strategy.
 

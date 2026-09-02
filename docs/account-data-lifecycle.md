@@ -12,10 +12,13 @@ antes de decisão do responsável pelo produto e revisão competente.
 - Sprint 18: aberta.
 - Checkpoint 18A: decisões aprovadas e documentadas.
 - Checkpoint 18B: exportação integral e portabilidade concluída com PASS local e no staging.
-- Próximo checkpoint: 18C, exclusão segura no servidor e banco.
-- Correção cadastral e exclusão de conta ainda não foram implementadas.
-- A 18B adicionou e promoveu somente a infraestrutura de exportação descrita neste documento; não
-  alterou as policies RLS existentes nem antecipou exclusão, textos jurídicos ou produção.
+- Checkpoint 18C: exclusão segura no servidor e banco concluída e validada localmente.
+- Checkpoint 18D: experiência de exclusão concluída e validada localmente.
+- Checkpoint 18E: em andamento; a 18E1 conclui a coerência técnica do ciclo de vida e atualiza este
+  contrato, sem publicar Política de Privacidade, Termos ou canal de suporte.
+- A exportação foi promovida e aceita no staging; a exclusão ainda não foi promovida nem aceita no
+  staging e permanece condicionada ao Checkpoint 18F.
+- Correção cadastral continua não implementada.
 
 ## Classificação das decisões
 
@@ -132,12 +135,13 @@ O contrato v1 implementado preserva estas decisões:
 - o aceite manual no staging confirmou os oito arquivos para uma conta vazia e, para uma conta com
   dados, o Project e a Transaction esperados, seus relacionamentos, moeda, origem, data e valor;
 - o painel **Seus dados** e o botão **Baixar meus dados**, originalmente reservados à experiência da
-  18D, foram antecipados para a 18B4 e fazem parte do PASS da 18B. Edição cadastral e exclusão
-  permanecem pendentes.
+  18D, foram antecipados para a 18B4 e fazem parte do PASS da 18B. Edição cadastral permanece
+  pendente; a exclusão foi implementada localmente na 18C/18D e aguarda promoção na 18F.
 
 ## Exclusão da conta
 
-A decisão aprovada é exclusão imediata e irreversível dos dados ativos. O fluxo planejado exige:
+A decisão aprovada é exclusão imediata e irreversível dos dados ativos. O fluxo implementado
+localmente exige:
 
 1. sessão autenticada válida;
 2. reautenticação com senha;
@@ -148,7 +152,8 @@ A decisão aprovada é exclusão imediata e irreversível dos dados ativos. O fl
 7. invalidação da sessão e remoção dos cookies aplicáveis;
 8. limpeza, no dispositivo atual, somente de preferências atribuíveis à conta excluída.
 
-A operação deverá remover a linha correspondente de `auth.users` e comprovar a cascata de:
+A operação remove a linha correspondente de `auth.users` e os testes locais comprovaram a cascata
+de:
 
 - `user_profiles`;
 - `projects`;
@@ -161,9 +166,20 @@ Não haverá período de arrependimento nesta fase. Não há assinatura, colabor
 cobrança a tratar. O desenho deverá ser reavaliado quando esses recursos existirem. A chave global
 legada não atribuída não será removida automaticamente.
 
-O mecanismo privilegiado estritamente necessário para apagar `auth.users` ainda será auditado na
-18C. Nenhuma chave administrativa pode chegar ao browser e nenhum ID fornecido pelo cliente pode
-determinar qual conta será excluída.
+O mecanismo da 18C usa uma primitiva PostgreSQL estreita: identidade derivada de `auth.uid()`, prova
+de autenticação recente por senha, wrapper público sem argumento de identidade e função privada
+inacessível aos papéis de cliente. O Worker não recebe `service_role` ou credencial administrativa,
+e nenhum ID fornecido pelo cliente determina a conta excluída.
+
+Após o servidor confirmar o commit da exclusão, a interface remove no dispositivo atual somente a
+preferência `smart-finance.active-project.v1.user.<usuário>` atribuível à conta excluída, usando o ID
+que a sessão autenticada já possuía antes da operação. A preferência de outro usuário, o tema, o
+workspace local de desenvolvimento/teste e a chave global legada não são removidos. Essa limpeza
+local não repete a exclusão remota nem depende de consultar uma sessão já destruída.
+
+Exclusão imediata significa remoção do banco ativo e das relações cobertas pelas cascatas. Não
+significa eliminação física imediata de cópias de backup; prazos, descarte e restauração continuam
+pendentes da arquitetura operacional da Sprint 19 e de revisão jurídica antes da publicação.
 
 ## Retenção aprovada e pendente
 
@@ -237,11 +253,11 @@ Antes de publicar Política de Privacidade e Termos como definitivos, será nece
 ## Fronteira com as próximas Sprints
 
 - 18B implementou e validou a exportação integral e portabilidade no staging.
-- 18C implementará e provará a exclusão segura no servidor e no banco.
-- 18D implementará correção de nome e exclusão em Configurações; a experiência de exportação já foi
-  antecipada e concluída na 18B4.
-- 18E publicará Privacidade, Termos, suporte e explicações de storage somente após resolver seus
-  bloqueios.
+- 18C implementou e provou localmente a exclusão segura no servidor e no banco.
+- 18D implementou e validou localmente a exclusão em Configurações; a experiência de exportação já
+  havia sido antecipada e concluída na 18B4. Correção de nome continua pendente.
+- 18E1 conclui a coerência técnica e documental do ciclo de vida. Privacidade, Termos, suporte e
+  explicações públicas de storage continuam bloqueados pelas definições formais e revisão jurídica.
 - 18F promoverá e validará a Sprint 18 em staging.
 - Sprint 19 tratará backup/restore, observabilidade, logs, prazos operacionais e proteção contra
   abuso.

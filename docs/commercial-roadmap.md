@@ -94,7 +94,8 @@ remotas não acionam fallback local. Não houve migração automática de usuár
 
 ## Sprint 18 — Ciclo de vida da conta e LGPD
 
-**Status: em andamento. Checkpoints 18A e 18B concluídos; 18C-18F pendentes.**
+**Status: em andamento. Checkpoints 18A e 18B concluídos; 18C e 18D concluídos localmente; 18E em
+andamento; promoção e aceite da exclusão no staging permanecem na 18F.**
 
 As decisões técnicas e de produto da 18A estão registradas em
 [`docs/account-data-lifecycle.md`](account-data-lifecycle.md). Esse registro orienta a implementação,
@@ -142,16 +143,20 @@ adotadas futuramente e a análise jurídica exigirem.
    arquivos, snapshot PostgreSQL autenticado, limites técnicos, endpoint binário sem cache e painel
    de download em Configurações foram validados localmente e no staging. O aceite cobriu conta
    vazia, conta com dados e isolamento A↔B sob RLS.
-3. **18C — Exclusão segura no servidor e banco — pendente.**
-4. **18D — Experiência de conta e exclusão — pendente:** o painel de exportação originalmente
-   previsto aqui foi antecipado e concluído na 18B4; edição cadastral e exclusão continuam
-   reservadas a esta etapa.
-5. **18E — Privacidade, Termos, suporte e storages — pendente e dependente das definições formais e
-   da revisão jurídica registradas na 18A.**
+3. **18C — Exclusão segura no servidor e banco — concluído localmente:** primitiva PostgreSQL
+   estreita, reautenticação por senha, endpoint sem credencial administrativa e aceite adversarial
+   local concluídos; promoção permanece reservada à 18F.
+4. **18D — Experiência de conta e exclusão — concluído localmente:** confirmação exata `EXCLUIR`,
+   senha atual, prevenção de duplo envio, erros sanitizados e recomendação de exportação foram
+   validados. O painel de exportação havia sido antecipado para a 18B4. Edição cadastral continua
+   pendente.
+5. **18E — Privacidade, Termos, suporte e storages — em andamento:** a 18E1 corrige a coerência
+   técnica do ciclo de vida e a documentação. Publicação de textos legais e suporte continua
+   dependente das definições formais e da revisão jurídica registradas na 18A.
 6. **18F — Promoção e aceite integral em staging — pendente.**
 
-O próximo checkpoint é a 18C. A conclusão da exportação na 18B não antecipa exclusão, edição
-cadastral, conformidade jurídica, operação de backups, produção ou monetização.
+O checkpoint atual é a 18E. A conclusão local da exclusão não antecipa seu aceite no staging,
+edição cadastral, conformidade jurídica, operação de backups, produção ou monetização.
 
 ## Sprint 19 — Confiabilidade, segurança e operação
 

@@ -25,6 +25,24 @@ export function persistActiveProjectPreference(
   else storage.removeItem(key);
 }
 
+export function removeActiveProjectPreference(
+  storage: Pick<Storage, "removeItem">,
+  userId: string,
+) {
+  storage.removeItem(activeProjectKey(userId));
+}
+
+export function removeBrowserActiveProjectPreference(
+  userId: string,
+  storage: Pick<Storage, "removeItem"> = window.localStorage,
+) {
+  try {
+    removeActiveProjectPreference(storage, userId);
+  } catch {
+    // Account deletion is already committed remotely. Local cleanup is best-effort and scoped.
+  }
+}
+
 export function createBrowserActiveProjectPreference(
   userId: string,
   storage: ActiveProjectStorage = window.localStorage,

@@ -110,8 +110,9 @@ This staging deployment is not a production launch. The controlled remote pilot 
 imports passed Sprint 16E acceptance. The former assisted local-data migration Sprint 16F was
 retired because no commercial legacy users exist; `docs/commercial-roadmap.md` supersedes it.
 Sprint 17 is closed with PASS and Sprint 18 is next. Production environments, domain, transactional
-SMTP, rate limiting, observability, backups, account
-export/deletion, LGPD operations, secret rotation and production rollback remain future work.
+SMTP, rate limiting, observability, backups, account deletion acceptance, LGPD operations, secret
+rotation and production rollback remain future work. Account export was promoted and accepted in
+staging during Sprint 18B.
 
 ## Sprint 16E remote pilot acceptance
 

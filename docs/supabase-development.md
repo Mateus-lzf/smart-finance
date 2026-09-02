@@ -260,10 +260,11 @@ remote repository delivered in Sprint 16E. Transaction CRUD remains unitary; bul
 the atomic RPCs and never a CRUD loop. The controlled pilot proved remote Projects, Transactions,
 preferences, CSV/XLSX imports and reimports without dual-write or automatic remote-to-local
 fallback. The former Sprint 16F was retired because no commercial legacy users require migration;
-`docs/commercial-roadmap.md` supersedes it. Production separation, domain,
-SMTP, rate limiting, observability, backup/recovery, account export/deletion, LGPD operations,
-secret rotation and rollback remain additional commercial work. None of these capabilities was
-implemented by Sprint 15.
+`docs/commercial-roadmap.md` supersedes it. Production separation, domain, SMTP, rate limiting,
+observability, backup/recovery, staging acceptance of account deletion, LGPD operations, secret
+rotation and rollback remain additional commercial work. Account export was completed and accepted
+in staging during Sprint 18B; account deletion is implemented only locally until Sprint 18F. None
+of these capabilities was implemented by Sprint 15.
 
 ## Sprint 16E closure
 
