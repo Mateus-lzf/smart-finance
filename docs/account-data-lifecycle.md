@@ -14,8 +14,9 @@ antes de decisão do responsável pelo produto e revisão competente.
 - Checkpoint 18B: exportação integral e portabilidade concluída com PASS local e no staging.
 - Checkpoint 18C: exclusão segura no servidor e banco concluída e validada localmente.
 - Checkpoint 18D: experiência de exclusão concluída e validada localmente.
-- Checkpoint 18E: em andamento; a 18E1 conclui a coerência técnica do ciclo de vida e atualiza este
-  contrato, sem publicar Política de Privacidade, Termos ou canal de suporte.
+- Checkpoint 18E: em andamento; a 18E1 concluiu a coerência técnica do ciclo de vida e a 18E2 criou
+  páginas públicas informativas de Privacidade e Termos, ainda sujeitas às definições formais e à
+  revisão competente antes do lançamento comercial.
 - A exportação foi promovida e aceita no staging; a exclusão ainda não foi promovida nem aceita no
   staging e permanece condicionada ao Checkpoint 18F.
 - Correção cadastral continua não implementada.
@@ -238,9 +239,10 @@ identificado no estado atual do repositório.
 O procedimento de mudança de e-mail não pode ser anunciado antes de existir canal real e processo
 seguro. Expansão internacional ou atendimento a menores exige nova revisão jurídica e de produto.
 
-## Bloqueios antes da 18E
+## Bloqueios para concluir a 18E
 
-Antes de publicar Política de Privacidade e Termos como definitivos, será necessário definir:
+As páginas informativas já descrevem o funcionamento comprovado do produto, sem campos fictícios.
+Antes de publicá-las como Política de Privacidade e Termos definitivos, será necessário definir:
 
 - controlador e informações formais aplicáveis;
 - contato real de suporte/LGPD;
@@ -256,8 +258,12 @@ Antes de publicar Política de Privacidade e Termos como definitivos, será nece
 - 18C implementou e provou localmente a exclusão segura no servidor e no banco.
 - 18D implementou e validou localmente a exclusão em Configurações; a experiência de exportação já
   havia sido antecipada e concluída na 18B4. Correção de nome continua pendente.
-- 18E1 conclui a coerência técnica e documental do ciclo de vida. Privacidade, Termos, suporte e
-  explicações públicas de storage continuam bloqueados pelas definições formais e revisão jurídica.
+- 18E1 concluiu a coerência técnica e documental do ciclo de vida. A 18E2 criou a infraestrutura
+  pública de Privacidade e Termos, links no cadastro, login e Configurações e explicações factuais de
+  storage. Os textos não registram aceite jurídico, não incluem identidade ou contato fictício e
+  continuam sujeitos às definições formais e à revisão competente.
+- O canal real de suporte/LGPD, a identificação formal do controlador, as bases legais detalhadas,
+  a retenção definitiva e a revisão jurídica continuam bloqueadores da 18E. A 18F não foi executada.
 - 18F promoverá e validará a Sprint 18 em staging.
 - Sprint 19 tratará backup/restore, observabilidade, logs, prazos operacionais e proteção contra
   abuso.

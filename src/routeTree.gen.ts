@@ -14,7 +14,9 @@ import { Route as AuthIndisponivelRouteImport } from './routes/auth-indisponivel
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as EsqueciSenhaRouteImport } from './routes/esqueci-senha'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCriarRouteImport } from './routes/_authenticated/criar'
@@ -53,9 +55,19 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
   id: '/redefinir-senha',
   path: '/redefinir-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -131,7 +143,9 @@ export interface FileRoutesByFullPath {
   '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/termos': typeof TermosRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/criar': typeof AuthenticatedCriarRoute
   '/dados': typeof AuthenticatedDadosRoute
@@ -150,7 +164,9 @@ export interface FileRoutesByTo {
   '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/termos': typeof TermosRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/criar': typeof AuthenticatedCriarRoute
   '/dados': typeof AuthenticatedDadosRoute
@@ -172,7 +188,9 @@ export interface FileRoutesById {
   '/cadastro': typeof CadastroRoute
   '/esqueci-senha': typeof EsqueciSenhaRoute
   '/login': typeof LoginRoute
+  '/privacidade': typeof PrivacidadeRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
+  '/termos': typeof TermosRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/criar': typeof AuthenticatedCriarRoute
   '/_authenticated/dados': typeof AuthenticatedDadosRoute
@@ -195,7 +213,9 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/esqueci-senha'
     | '/login'
+    | '/privacidade'
     | '/redefinir-senha'
+    | '/termos'
     | '/configuracoes'
     | '/criar'
     | '/dados'
@@ -214,7 +234,9 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/esqueci-senha'
     | '/login'
+    | '/privacidade'
     | '/redefinir-senha'
+    | '/termos'
     | '/configuracoes'
     | '/criar'
     | '/dados'
@@ -235,7 +257,9 @@ export interface FileRouteTypes {
     | '/cadastro'
     | '/esqueci-senha'
     | '/login'
+    | '/privacidade'
     | '/redefinir-senha'
+    | '/termos'
     | '/_authenticated/configuracoes'
     | '/_authenticated/criar'
     | '/_authenticated/dados'
@@ -257,7 +281,9 @@ export interface RootRouteChildren {
   CadastroRoute: typeof CadastroRoute
   EsqueciSenhaRoute: typeof EsqueciSenhaRoute
   LoginRoute: typeof LoginRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
+  TermosRoute: typeof TermosRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthConfirmarRoute: typeof AuthConfirmarRoute
   ApiAccountDeleteRoute: typeof ApiAccountDeleteRoute
@@ -301,11 +327,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/redefinir-senha': {
       id: '/redefinir-senha'
       path: '/redefinir-senha'
       fullPath: '/redefinir-senha'
       preLoaderRoute: typeof RedefinirSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -436,7 +476,9 @@ const rootRouteChildren: RootRouteChildren = {
   CadastroRoute: CadastroRoute,
   EsqueciSenhaRoute: EsqueciSenhaRoute,
   LoginRoute: LoginRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
+  TermosRoute: TermosRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthConfirmarRoute: AuthConfirmarRoute,
   ApiAccountDeleteRoute: ApiAccountDeleteRoute,

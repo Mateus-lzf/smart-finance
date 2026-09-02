@@ -68,6 +68,16 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+@layer components {
+  .legal-content h2 {
+    @apply mt-9 text-xl font-semibold tracking-tight first:mt-0;
+  }
+
+  .legal-content p {
+    @apply mt-3 text-sm leading-7 text-muted-foreground sm:text-base;
+  }
+}
+
 :root {
   --radius: 0.875rem;
   --background: oklch(0.977 0.005 117.9);

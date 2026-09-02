@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { PRODUCT_NAME } from "@/lib/product-config";
 import { cn } from "@/lib/utils";
 import { persistTheme, readStoredTheme, type Theme } from "@/lib/theme-service";
+import { LegalLinks } from "@/components/legal-page";
 
 export function AuthPage({
   title,
@@ -86,6 +87,9 @@ export function AuthPage({
             <div className="mt-7">{children}</div>
           </div>
           {footer && <div className="mt-5 text-center text-sm text-muted-foreground">{footer}</div>}
+          <div className="mt-4 text-xs text-muted-foreground">
+            <LegalLinks />
+          </div>
         </div>
       </section>
     </main>
@@ -167,7 +171,7 @@ export function AuthLink({
   to,
   children,
 }: {
-  to: "/login" | "/cadastro" | "/esqueci-senha";
+  to: "/login" | "/cadastro" | "/esqueci-senha" | "/privacidade" | "/termos";
   children: ReactNode;
 }) {
   return (

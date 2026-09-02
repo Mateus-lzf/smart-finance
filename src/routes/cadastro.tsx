@@ -122,6 +122,12 @@ function SignupPage() {
             minLength={8}
           />
           <p className="text-xs text-muted-foreground">Use pelo menos 8 caracteres.</p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Antes de criar sua conta, consulte nossa{" "}
+            <AuthLink to="/privacidade">Privacidade</AuthLink> e os{" "}
+            <AuthLink to="/termos">Termos de Uso</AuthLink>. A criação da conta não registra aceite
+            jurídico nesta versão.
+          </p>
           <AuthSubmit loading={loading}>Criar conta</AuthSubmit>
         </form>
       )}

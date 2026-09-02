@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Check, Cloud, HardDrive, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { Check, Cloud, FileText, HardDrive, LogOut, Mail, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app/app-shell";
 import { productTitle } from "@/lib/product-config";
 import { Panel } from "@/components/app/panel";
@@ -135,6 +135,23 @@ function ConfigPage() {
                 </span>
               </button>
             ))}
+          </div>
+        </Panel>
+
+        <Panel title="Informações legais" subtitle="Consulte os documentos da versão atual">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Link
+              to="/privacidade"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+            >
+              <FileText className="size-4 text-primary" /> Privacidade
+            </Link>
+            <Link
+              to="/termos"
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+            >
+              <FileText className="size-4 text-primary" /> Termos de Uso
+            </Link>
           </div>
         </Panel>
 

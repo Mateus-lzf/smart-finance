@@ -150,13 +150,16 @@ adotadas futuramente e a análise jurídica exigirem.
    senha atual, prevenção de duplo envio, erros sanitizados e recomendação de exportação foram
    validados. O painel de exportação havia sido antecipado para a 18B4. Edição cadastral continua
    pendente.
-5. **18E — Privacidade, Termos, suporte e storages — em andamento:** a 18E1 corrige a coerência
-   técnica do ciclo de vida e a documentação. Publicação de textos legais e suporte continua
-   dependente das definições formais e da revisão jurídica registradas na 18A.
+5. **18E — Privacidade, Termos, suporte e storages — em andamento:** a 18E1 concluiu a coerência
+   técnica do ciclo de vida; a 18E2 criou páginas públicas informativas de Privacidade e Termos e
+   seus links no cadastro, login e Configurações. Não há checkbox nem registro de aceite. Identidade
+   formal do controlador, suporte/LGPD, bases legais, retenção e revisão jurídica continuam
+   pendentes antes da publicação comercial definitiva.
 6. **18F — Promoção e aceite integral em staging — pendente.**
 
-O checkpoint atual é a 18E. A conclusão local da exclusão não antecipa seu aceite no staging,
-edição cadastral, conformidade jurídica, operação de backups, produção ou monetização.
+O checkpoint atual é a 18E. A infraestrutura pública da 18E2 não conclui a revisão jurídica nem
+antecipa o suporte ou o aceite no staging. A conclusão local da exclusão não antecipa seu aceite no
+staging, edição cadastral, conformidade jurídica, operação de backups, produção ou monetização.
 
 ## Sprint 19 — Confiabilidade, segurança e operação
 
